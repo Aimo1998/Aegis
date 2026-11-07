@@ -13,6 +13,7 @@ enum AppMode: String, CaseIterable, Identifiable {
     case dylibs = "注入库"
     case history = "历史"
     case redteam = "红队自测"
+    case sysinfo = "系统信息"
 
     var id: String { rawValue }
 
@@ -22,6 +23,7 @@ enum AppMode: String, CaseIterable, Identifiable {
         case .dylibs:  return "square.stack.3d.up"
         case .history: return "clock.arrow.circlepath"
         case .redteam: return "testtube.2"
+        case .sysinfo: return "info.circle"
         }
     }
 
@@ -31,6 +33,7 @@ enum AppMode: String, CaseIterable, Identifiable {
         case .dylibs:  return "已加载动态库清单"
         case .history: return "扫描记录与变化对比"
         case .redteam: return "验证检测器灵敏度"
+        case .sysinfo: return "底层返回值诊断"
         }
     }
 }
@@ -62,6 +65,7 @@ struct ContentView: View {
                 case .dylibs:  DylibListView()
                 case .history: HistoryView()
                 case .redteam: RedTeamView()
+                case .sysinfo: SystemInfoView()
                 }
             }
         }
