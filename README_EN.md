@@ -267,7 +267,7 @@ To supply custom notes, pass a Markdown file as the fourth argument:
 
 - iOS **16.0+** (`kerning` / `tracking` and similar SwiftUI APIs need 16+)
 - Build: Xcode 15+ / XcodeGen
-- Tested on: Dopamine (arm64)
+- Tested on: Dopamine3 (arm64)
 
 ---
 
