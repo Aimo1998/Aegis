@@ -113,7 +113,13 @@ struct HistoryView: View {
             if expanded {
                 VStack(alignment: .leading, spacing: 9) {
                     if let prev = diff.previous {
-                        comparisonBlock(diff: diff, previous: prev)
+                        if prev.total == entry.total {
+                            comparisonBlock(diff: diff, previous: prev)
+                        } else {
+                            Text("扫描范围不同（上次 \(prev.total) 项，本次 \(entry.total) 项），无法直接对比")
+                                .font(.system(size: 11.5, design: .rounded))
+                                .foregroundStyle(Color(red: 1.0, green: 0.75, blue: 0.45).opacity(0.8))
+                        }
                     } else {
                         Text("这是该等级的第一条记录，暂无对比基准")
                             .font(.system(size: 11.5, design: .rounded))

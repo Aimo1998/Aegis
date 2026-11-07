@@ -39,14 +39,28 @@ enum DetectionLevel: String, CaseIterable, Identifiable {
         }
     }
 
-    /// 该等级包含的所有检测项
-    var checks: [Detector] {
+    /// 仅本等级的检测项
+    var own: [Detector] {
         switch self {
         case .c: return LevelC.all
         case .b: return LevelB.all
         case .a: return LevelA.all
         }
     }
+
+    /// 实际要跑的检测项
+    /// - Parameter cascade: true 时递进包含低等级（B=C+B，A=C+B+A）
+    func checks(cascade: Bool) -> [Detector] {
+        guard cascade else { return own }
+        switch self {
+        case .c: return LevelC.all
+        case .b: return LevelC.all + LevelB.all
+        case .a: return LevelC.all + LevelB.all + LevelA.all
+        }
+    }
+
+    /// 兼容旧调用：默认不递进
+    var checks: [Detector] { own }
 }
 
 /// 单个检测项
@@ -120,7 +134,7 @@ struct ScanReport {
 
     /// 命中项权重占全部权重的百分比（0–100）
     var riskScore: Int {
-        let total = DetectorCatalog.totalWeight
+        let total = totalWeight
         guard total > 0 else { return 0 }
         let hit = results.filter(\.triggered).reduce(0) { $0 + $1.weight }
         let pct = Double(hit) / Double(total) * 100.0
@@ -132,7 +146,10 @@ struct ScanReport {
         results.filter(\.triggered).reduce(0) { $0 + $1.weight }
     }
 
-    var totalWeight: Int { DetectorCatalog.totalWeight }
+    /// 本次扫描涉及项的总权重（不是全部 17 项的权重）
+    var totalWeight: Int {
+        results.reduce(0) { $0 + $1.weight }
+    }
 
     struct RiskTier {
         let label: String

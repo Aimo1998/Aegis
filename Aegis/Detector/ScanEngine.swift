@@ -16,7 +16,7 @@ final class ScanEngine: ObservableObject {
     @Published var report: ScanReport?
 
     /// 开始扫描指定等级
-    func scan(level: DetectionLevel) {
+    func scan(level: DetectionLevel, cascade: Bool = false) {
         guard !isScanning else { return }
 
         isScanning = true
@@ -24,7 +24,7 @@ final class ScanEngine: ObservableObject {
         report = nil
         currentCheck = ""
 
-        let checks = level.checks
+        let checks = level.checks(cascade: cascade)
 
         // 必须在后台线程跑：
         //  - canOpenURL 内部要回主线程，如果在主线程调用会死锁

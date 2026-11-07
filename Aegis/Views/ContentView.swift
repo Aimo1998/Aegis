@@ -44,6 +44,7 @@ struct ContentView: View {
     @State private var selectedLevel: DetectionLevel = .a
     @State private var mode: AppMode = .detect
     @State private var showMenu = false
+    @State private var cascade = false
 
     private let bgTop = Color(red: 0.05, green: 0.06, blue: 0.10)
     private let bgMid = Color(red: 0.09, green: 0.10, blue: 0.17)
@@ -273,16 +274,54 @@ struct ContentView: View {
     private var levelPicker: some View {
         VStack(spacing: 10) {
             ForEach(DetectionLevel.allCases) { level in
-                LevelCard(level: level, selected: selectedLevel == level) {
+                LevelCard(level: level,
+                          selected: selectedLevel == level,
+                          count: level.checks(cascade: cascade).count) {
                     selectedLevel = level
                 }
             }
+
+            cascadeToggle
         }
+    }
+
+    /// 递进检测开关
+    private var cascadeToggle: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Toggle(isOn: $cascade) {
+                HStack(spacing: 7) {
+                    Image(systemName: "arrow.down.right.and.arrow.up.left")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.5))
+                    Text("递进检测")
+                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.85))
+                }
+            }
+            .tint(Color(red: 0.42, green: 0.70, blue: 1.0))
+
+            Text(cascade
+                 ? "已开启：B 级会同时跑 C 级，A 级会跑 C+B+A"
+                 : "已关闭：仅运行所选等级自身的检测项")
+                .font(.system(size: 11, design: .rounded))
+                .foregroundStyle(.white.opacity(0.32))
+                .padding(.leading, 2)
+        }
+        .padding(.horizontal, 15)
+        .padding(.vertical, 13)
+        .background(
+            RoundedRectangle(cornerRadius: 15, style: .continuous)
+                .fill(Color.white.opacity(0.03))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 15, style: .continuous)
+                        .stroke(Color.white.opacity(0.05), lineWidth: 1)
+                )
+        )
     }
 
     private var startButton: some View {
         Button {
-            engine.scan(level: selectedLevel)
+            engine.scan(level: selectedLevel, cascade: cascade)
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: "waveform.path.ecg")
@@ -369,6 +408,7 @@ struct ContentView: View {
 struct LevelCard: View {
     let level: DetectionLevel
     let selected: Bool
+    let count: Int
     let action: () -> Void
 
     var body: some View {
@@ -381,7 +421,7 @@ struct LevelCard: View {
                     Text(level.title)
                         .font(.system(size: 15, weight: .semibold, design: .rounded))
                         .foregroundStyle(.white)
-                    Text("\(level.subtitle) · \(level.checks.count) 项")
+                    Text("\(level.subtitle) · \(count) 项")
                         .font(.system(size: 11.5, design: .rounded))
                         .foregroundStyle(.white.opacity(0.4))
                 }
