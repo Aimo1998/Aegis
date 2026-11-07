@@ -329,6 +329,12 @@ enum LevelB {
                 } else {
                     dest = "?"
                 }
+
+                // Dopamine / 多数 rootless 方案的标准结构：
+                // /var/jb -> /private/preboot/<UUID>/dopamine-xxx/procursus/
+                // 这是设计如此，不是"残留"，排除掉
+                if dest.hasPrefix("/private/preboot/") { continue }
+
                 hits.append("\(path) → \(dest)")
             }
 
@@ -403,34 +409,20 @@ enum LevelB {
         }
     )
 
-    // MARK: B10 · 自身运行路径
+    // MARK: B10 · 二进制加密状态
 
     static let selfPathCheck = Detector(
         id: "B10",
         level: .b,
-        name: "自身运行路径",
-        detail: "检查 App 自身的可执行文件是否从越狱目录（/var/jb、/private/preboot、/.jbroot）加载。装在沙盒容器外即说明以越狱方式部署。",
+        name: "二进制加密状态",
+        detail: "读取自身 Mach-O 的 LC_ENCRYPTION_INFO_64，检查 cryptid 字段。App Store 分发的 App 是加密的（cryptid=1），自签名、企业签或越狱部署的为 0。沙盒内无法访问 /var/jb，所以改用这条能真正区分的判据。",
         run: {
-            let fm = FileManager.default
-
-            // iOS 会把越狱 App 复制到沙盒容器里运行，所以 executablePath
-            // 通常仍在 /var/containers/... 下 —— 直接看路径抓不到。
-            // 改为检查越狱目录里是否同时存在同名 App 包。
-            let appName = Bundle.main.bundleURL.lastPathComponent
-            guard !appName.isEmpty else { return nil }
-
-            let jailRoots = ["/var/jb/Applications", "/Applications"]
-            for root in jailRoots {
-                let path = root + "/" + appName
-                if fm.fileExists(atPath: path) {
-                    return "越狱目录存在同名 App：\(path)"
-                }
+            var cryptid: UInt32 = 0
+            guard aegis_self_cryptid(&cryptid) else {
+                return nil     // 没有该 load command（老式二进制），跳过
             }
-
-            // 可执行文件本身若直接从越狱路径运行，也直接命中
-            let exe = Bundle.main.executablePath ?? ""
-            for m in ["/var/jb/", "/.jbroot/", "/private/preboot/"] where exe.contains(m) {
-                return "可执行文件位于越狱路径：\(exe)"
+            if cryptid == 0 {
+                return "Mach-O 未加密（cryptid=0，非 App Store 分发）"
             }
             return nil
         }

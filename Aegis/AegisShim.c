@@ -343,3 +343,31 @@ bool aegis_self_header_info(uint32_t *outNcmds, uint32_t *outSizeofcmds) {
     if (outSizeofcmds) *outSizeofcmds = hdr->sizeofcmds;
     return true;
 }
+
+
+/// 读取主程序 Mach-O 的 LC_ENCRYPTION_INFO_64 cryptid
+/// cryptid = 1 表示加密（App Store 分发），0 表示未加密（自签名/越狱部署）
+bool aegis_self_cryptid(uint32_t *outCryptid) {
+    const struct mach_header_64 *hdr =
+        (const struct mach_header_64 *)_dyld_get_image_header(0);
+    if (!hdr || hdr->magic != MH_MAGIC_64) return false;
+
+    const uint8_t *p = (const uint8_t *)(hdr + 1);
+    const uint8_t *limit = p + hdr->sizeofcmds;
+
+    for (uint32_t c = 0; c < hdr->ncmds; c++) {
+        if (p + sizeof(struct load_command) > limit) break;
+        const struct load_command *lc = (const struct load_command *)p;
+        if (lc->cmdsize < sizeof(struct load_command)) break;
+
+        if (lc->cmd == LC_ENCRYPTION_INFO_64 &&
+            lc->cmdsize >= sizeof(struct encryption_info_command_64)) {
+            const struct encryption_info_command_64 *ei =
+                (const struct encryption_info_command_64 *)lc;
+            if (outCryptid) *outCryptid = ei->cryptid;
+            return true;
+        }
+        p += lc->cmdsize;
+    }
+    return false;
+}
