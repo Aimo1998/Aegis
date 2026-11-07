@@ -146,9 +146,9 @@ enum LevelA {
 
             // 1. kern.bootargs
             var buf = [CChar](repeating: 0, count: 4096)
-            var outLen = 0
+            var outLen: size_t = 0
             let ok = buf.withUnsafeMutableBufferPointer { p -> Bool in
-                aegis_read_bootargs(p.baseAddress, 4096, &outLen)
+                aegis_read_bootargs(p.baseAddress, size_t(4096), &outLen)
             }
 
             if ok {

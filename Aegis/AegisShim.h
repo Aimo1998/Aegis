@@ -8,8 +8,10 @@
 #ifndef AegisShim_h
 #define AegisShim_h
 
+#include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <sys/types.h>
 
 /// 直接走 SYS_lstat 原始系统调用（绕过 libc 层可能的 Hook）
 int aegis_raw_lstat(const char *path, void *statBuf);
