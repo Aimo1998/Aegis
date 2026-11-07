@@ -38,7 +38,7 @@
 	</array>
 
 	<key>MinimumOSVersion</key>
-	<string>15.0</string>
+	<string>16.0</string>
 	<key>UIDeviceFamily</key>
 	<array>
 		<integer>1</integer>
