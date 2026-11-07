@@ -1,8 +1,6 @@
-# Codemagic 备用构建配置（GitHub Actions 排不到 macOS 时用这个）
-# 用法：https://codemagic.io 注册 → 连 GitHub → 选 Aegis 仓库 → 自动识别此文件 → Start build
 workflows:
   aegis-unsigned-ipa:
-    name: Aegis unsigned IPA
+    name: Aegis DEB + IPA
     instance_type: mac_mini_m2
     max_build_duration: 40
     environment:
@@ -11,13 +9,13 @@ workflows:
         XCODE_SCHEME: Aegis
         XCODE_PROJECT: Aegis.xcodeproj
     scripts:
-      - name: Install XcodeGen
+      - name: Install tools
         script: |
           brew install xcodegen || true
+          brew install dpkg || true
       - name: Generate Xcode project
         script: |
           xcodegen generate
-          ls -la
       - name: Build unsigned
         script: |
           set -o pipefail
@@ -32,14 +30,73 @@ workflows:
             CODE_SIGNING_ALLOWED=NO \
             DEVELOPMENT_TEAM="" \
             build
+      - name: Verify app
+        script: |
+          APP="build/Build/Products/Release-iphoneos/Aegis.app"
+          ls -la "$APP"
+          file "$APP/Aegis"
+          echo "--- 主二进制大小 ---"
+          du -h "$APP/Aegis"
       - name: Package IPA
         script: |
           APP="build/Build/Products/Release-iphoneos/Aegis.app"
-          ls -la "$APP" || exit 1
           rm -rf Payload Aegis.ipa
           mkdir -p Payload
           cp -R "$APP" Payload/
           zip -qr Aegis.ipa Payload
           ls -lh Aegis.ipa
+      - name: Package DEB
+        script: |
+          set -e
+          APP="build/Build/Products/Release-iphoneos/Aegis.app"
+          rm -rf pkg && mkdir -p pkg/DEBIAN pkg/var/jb/Applications
+          cp -R "$APP" pkg/var/jb/Applications/
+
+          cat > pkg/DEBIAN/control <<'CTRL'
+          Package: com.aegis.detector
+          Name: Aegis
+          Version: 1.0.0
+          Architecture: iphoneos-arm64
+          Maintainer: local
+          Author: local
+          Section: Utilities
+          Description: iOS 越狱环境检测（C/B/A 三级）
+          CTRL
+
+          cat > pkg/DEBIAN/postinst <<'POST'
+          #!/bin/bash
+          set -u
+          JB="/var/jb"; [ -d "$JB" ] || JB=""
+          APP="$JB/Applications/Aegis.app"
+          echo "[Aegis] 安装到 $APP"
+          if [ -f "$APP/Aegis" ]; then
+              LDID=""
+              for p in "$JB/usr/bin/ldid" /usr/bin/ldid "$JB/usr/local/bin/ldid"; do
+                  [ -x "$p" ] && { LDID="$p"; break; }
+              done
+              if [ -n "$LDID" ]; then
+                  echo "[Aegis] 签名: $LDID"
+                  "$LDID" -S "$APP/Aegis" && echo "[Aegis] 签名成功"
+              else
+                  echo "[Aegis] 警告: 未找到 ldid"
+              fi
+              chown -R root:wheel "$APP" 2>/dev/null
+              chmod 0755 "$APP/Aegis"
+          fi
+          if command -v uicache >/dev/null 2>&1; then
+              uicache -p "$APP" >/dev/null 2>&1 || true
+          fi
+          echo "[Aegis] 完成，回桌面即可看到图标"
+          exit 0
+          POST
+          chmod 0755 pkg/DEBIAN/postinst
+
+          # 去掉 control 里每行的前导空格
+          sed -i '' 's/^  //' pkg/DEBIAN/control 2>/dev/null || sed -i 's/^  //' pkg/DEBIAN/control
+
+          dpkg-deb --build --root-owner-group pkg Aegis.deb
+          ls -lh Aegis.deb
+          dpkg-deb -c Aegis.deb | head -20
     artifacts:
+      - Aegis.deb
       - Aegis.ipa
