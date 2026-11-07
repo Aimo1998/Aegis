@@ -62,7 +62,7 @@ extension ScanReport {
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZZZZZ"
         dict["app"] = "Aegis"
-        dict["version"] = "1.4.0"
+        dict["version"] = (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "?"
         dict["time"] = f.string(from: startedAt)
         dict["device"] = Self.deviceModel()
         dict["system"] = "iOS \(UIDevice.current.systemVersion)"

@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct CompareView: View {
 
@@ -35,6 +36,7 @@ struct CompareView: View {
                 inputBox(title: l10n.t("设备 B 报告", "Device B report"), text: $textB)
 
                 Button {
+                    hideKeyboard()
                     diff = analyze()
                 } label: {
                     Text(l10n.t("开始对比", "Compare"))
@@ -64,6 +66,12 @@ struct CompareView: View {
             .padding(.top, 12)
             .padding(.bottom, 40)
         }
+        .scrollDismissesKeyboard(.interactively)
+    }
+
+    private func hideKeyboard() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),
+                                        to: nil, from: nil, for: nil)
     }
 
     private var intro: some View {
@@ -106,6 +114,8 @@ struct CompareView: View {
                 Text(d.deviceA.isEmpty ? "A" : d.deviceA)
                     .font(.system(size: 11.5, weight: .medium, design: .rounded))
                     .foregroundStyle(.white.opacity(0.5))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                 Spacer()
                 Text("\(d.scoreA) vs \(d.scoreB)")
                     .font(.system(size: 15, weight: .bold, design: .rounded))
@@ -114,6 +124,8 @@ struct CompareView: View {
                 Text(d.deviceB.isEmpty ? "B" : d.deviceB)
                     .font(.system(size: 11.5, weight: .medium, design: .rounded))
                     .foregroundStyle(.white.opacity(0.5))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
             .padding(.vertical, 8)
 
