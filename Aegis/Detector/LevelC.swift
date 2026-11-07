@@ -242,7 +242,7 @@ enum LevelC {
         id: "C5",
         level: .c,
         name: "模拟器与硬件指纹",
-        detail: "检查是否运行在模拟器（TARGET_OS_SIMULATOR / hw.machine / hw.model），并通过 LocalAuthentication 的 biometryType 判断是否存在真实生物识别硬件（Touch ID / Face ID）。模拟器无法通过此项。",
+        detail: "检查是否运行在模拟器（TARGET_OS_SIMULATOR 与 hw.machine 架构），并通过 LocalAuthentication 的 biometryType 判断是否存在真实生物识别硬件（Touch ID / Face ID）。只认明确的模拟器特征，识别不出的型号一律视为真机。",
         run: {
             var reasons: [String] = []
 
@@ -250,25 +250,22 @@ enum LevelC {
             reasons.append("编译目标为模拟器（TARGET_OS_SIMULATOR）")
             #endif
 
-            // 1. hw.machine：模拟器为 x86_64 / arm64，真机为 iPhoneXX,X 之类
+            // hw.machine：iOS 真机为 iPhoneXX,X / iPadXX,X；模拟器为 arm64 / x86_64
+            // 注意：iOS 的 hw.model 返回硬件平台代号（如 iPhone X 是 D22AP），
+            // 不是机型字符串，用它判断真机是错的。
+            // 只认「明确的模拟器特征」，识别不出的型号一律视为真机，
+            // 避免因机型代号格式差异造成假阳性。
             if let machine = sysctlString("hw.machine") {
-                if machine == "x86_64" || machine == "arm64" || machine.hasPrefix("i386") {
-                    reasons.append("hw.machine = \(machine)（非真机）")
+                let isSimulator = machine == "x86_64"
+                    || machine == "arm64"
+                    || machine == "arm64e"
+                    || machine.hasPrefix("i386")
+                if isSimulator {
+                    reasons.append("hw.machine = \(machine)（模拟器架构）")
                 }
             }
 
-            // 2. hw.model：真机应以 iPhone / iPad / iPod 开头
-            if let model = sysctlString("hw.model") {
-                let isRealDevice = model.hasPrefix("iPhone")
-                    || model.hasPrefix("iPad")
-                    || model.hasPrefix("iPod")
-                    || model.hasPrefix("Mac")
-                if !isRealDevice {
-                    reasons.append("hw.model = \(model)（非 iOS 真机型号）")
-                }
-            }
-
-            // 3. 生物识别硬件：biometryType 反映硬件是否存在，
+            // 生物识别硬件：biometryType 反映硬件是否存在，
             //    与「用户是否录入了指纹/面容」无关
             let ctx = LAContext()
             _ = ctx.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: nil)

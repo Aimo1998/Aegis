@@ -55,7 +55,7 @@ workflows:
           cat > pkg/DEBIAN/control <<'CTRL'
           Package: com.aegis.detector
           Name: Aegis
-          Version: 1.1.0
+          Version: 1.1.1
           Architecture: iphoneos-arm64
           Maintainer: local
           Author: local
