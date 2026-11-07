@@ -31,6 +31,14 @@ enum DetectionLevel: String, CaseIterable, Identifiable {
         }
     }
 
+    var subtitleLocalized: String {
+        switch self {
+        case .c: return L10n.shared.t("针对传统有根越狱", "Classic rootful jailbreaks")
+        case .b: return L10n.shared.t("针对无根越狱 / 注入", "Rootless & injection")
+        case .a: return L10n.shared.t("针对 RootHide / 高级隐藏", "RootHide & deep hiding")
+        }
+    }
+
     var badge: String {
         switch self {
         case .c: return "🔵"

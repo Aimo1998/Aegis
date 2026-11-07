@@ -269,7 +269,8 @@ struct ResultView: View {
     }
 
     private var footer: some View {
-        Text("Aegis 检测结果仅供参考，单项异常不必然等同于环境被入侵")
+        Text(L10n.shared.t("Aegis 检测结果仅供参考，单项异常不必然等同于环境被入侵",
+                              "Results are advisory; one anomaly does not imply compromise"))
             .font(.system(size: 11.5, weight: .regular, design: .rounded))
             .foregroundStyle(.white.opacity(0.28))
             .multilineTextAlignment(.center)

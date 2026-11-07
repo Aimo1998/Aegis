@@ -39,6 +39,17 @@ enum ImageCategory: String, CaseIterable {
         case .other: return "🟡"
         }
     }
+
+    var localizedName: String {
+        switch self {
+        case .app:               return L10n.shared.t("本 App", "App")
+        case .jailbreakInjected: return L10n.shared.t("越狱注入", "Jailbreak injected")
+        case .other:             return L10n.shared.t("其他", "Other")
+        case .systemFramework:   return L10n.shared.t("系统框架", "System framework")
+        case .systemLib:         return L10n.shared.t("系统库", "System library")
+        case .dyldCache:         return L10n.shared.t("dyld 共享缓存", "dyld shared cache")
+        }
+    }
 }
 
 enum DylibScanner {

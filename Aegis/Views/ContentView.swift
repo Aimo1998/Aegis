@@ -30,14 +30,29 @@ enum AppMode: String, CaseIterable, Identifiable {
         }
     }
 
-    var subtitle: String {
+    var subtitle: String { subtitleLocalized }
+
+    // MARK: 本地化
+
+    var title: String {
         switch self {
-        case .detect:  return "越狱环境检测"
-        case .dylibs:  return "已加载动态库清单"
-        case .history: return "扫描记录与变化对比"
-        case .redteam: return "验证检测器灵敏度"
-        case .sysinfo: return "底层返回值诊断"
-        case .compare: return "两台设备报告对比"
+        case .detect:  return L10n.shared.t("检测", "Detect")
+        case .dylibs:  return L10n.shared.t("注入库", "Images")
+        case .history: return L10n.shared.t("历史", "History")
+        case .redteam: return L10n.shared.t("红队自测", "Red Team")
+        case .sysinfo: return L10n.shared.t("系统信息", "System Info")
+        case .compare: return L10n.shared.t("对比", "Compare")
+        }
+    }
+
+    var subtitleLocalized: String {
+        switch self {
+        case .detect:  return L10n.shared.t("越狱环境检测", "Jailbreak detection")
+        case .dylibs:  return L10n.shared.t("已加载动态库清单", "Loaded dylib list")
+        case .history: return L10n.shared.t("扫描记录与变化对比", "History & diff")
+        case .redteam: return L10n.shared.t("验证检测器灵敏度", "Validate detectors")
+        case .sysinfo: return L10n.shared.t("底层返回值诊断", "Raw value diagnostics")
+        case .compare: return L10n.shared.t("两台设备报告对比", "Compare two reports")
         }
     }
 }
@@ -45,6 +60,7 @@ enum AppMode: String, CaseIterable, Identifiable {
 struct ContentView: View {
 
     @StateObject private var engine = ScanEngine()
+    @ObservedObject private var l10n = L10n.shared
     @State private var selectedLevel: DetectionLevel = .a
     @State private var mode: AppMode = .detect
     @State private var showMenu = false
@@ -103,10 +119,10 @@ struct ContentView: View {
             .buttonStyle(.plain)
 
             VStack(alignment: .leading, spacing: 1) {
-                Text(mode.rawValue)
+                Text(mode.title)
                     .font(.system(size: 16, weight: .semibold, design: .rounded))
                     .foregroundStyle(.white)
-                Text(mode.subtitle)
+                Text(mode.subtitleLocalized)
                     .font(.system(size: 10.5, design: .rounded))
                     .foregroundStyle(.white.opacity(0.35))
             }
@@ -143,7 +159,7 @@ struct ContentView: View {
             ScrollView {
                 VStack(spacing: 10) {
                 HStack {
-                    Text("模式")
+                    Text(L10n.shared.t("模式", "Modes"))
                         .font(.system(size: 17, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
                     Spacer()
@@ -166,10 +182,10 @@ struct ContentView: View {
                                 .frame(width: 26)
 
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(m.rawValue)
+                                Text(m.title)
                                     .font(.system(size: 15, weight: .semibold, design: .rounded))
                                     .foregroundStyle(.white)
-                                Text(m.subtitle)
+                                Text(m.subtitleLocalized)
                                     .font(.system(size: 11, design: .rounded))
                                     .foregroundStyle(.white.opacity(0.35))
                             }
@@ -371,7 +387,7 @@ struct ContentView: View {
                 .font(.system(size: 33, weight: .bold, design: .rounded))
                 .foregroundStyle(.white)
 
-            Text("越狱环境检测")
+            Text(L10n.shared.t("越狱环境检测", "Jailbreak Detection"))
                 .font(.system(size: 13, weight: .medium, design: .rounded))
                 .foregroundStyle(.white.opacity(0.5))
                 .kerning(2.2)
@@ -401,7 +417,7 @@ struct ContentView: View {
                     Image(systemName: "arrow.down.right.and.arrow.up.left")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(.white.opacity(0.5))
-                    Text("递进检测")
+                    Text(L10n.shared.t("递进检测", "Cascade"))
                         .font(.system(size: 14, weight: .medium, design: .rounded))
                         .foregroundStyle(.white.opacity(0.85))
                 }
@@ -409,8 +425,10 @@ struct ContentView: View {
             .tint(Color(red: 0.42, green: 0.70, blue: 1.0))
 
             Text(cascade
-                 ? "已开启：B 级会同时跑 C 级，A 级会跑 C+B+A"
-                 : "已关闭：仅运行所选等级自身的检测项")
+                 ? L10n.shared.t("已开启：B 级会同时跑 C 级，A 级会跑 C+B+A",
+                                 "On: B runs C too, A runs C+B+A")
+                 : L10n.shared.t("已关闭：仅运行所选等级自身的检测项",
+                                 "Off: only the selected level runs"))
                 .font(.system(size: 11, design: .rounded))
                 .foregroundStyle(.white.opacity(0.32))
                 .padding(.leading, 2)
@@ -434,7 +452,7 @@ struct ContentView: View {
             HStack(spacing: 10) {
                 Image(systemName: "waveform.path.ecg")
                     .font(.system(size: 16, weight: .semibold))
-                Text("开始检测")
+                Text(L10n.shared.t("开始检测", "Start Scan"))
                     .font(.system(size: 17, weight: .semibold, design: .rounded))
             }
             .foregroundStyle(.black)
@@ -458,7 +476,8 @@ struct ContentView: View {
     }
 
     private var footerNote: some View {
-        Text("检测全程本地执行，不联网、不上传任何数据")
+        Text(L10n.shared.t("检测全程本地执行，不联网、不上传任何数据",
+                               "Runs fully offline. No network, no upload."))
             .font(.system(size: 11.5, design: .rounded))
             .foregroundStyle(.white.opacity(0.3))
             .multilineTextAlignment(.center)
@@ -496,10 +515,10 @@ struct ContentView: View {
             }
 
             VStack(spacing: 7) {
-                Text("正在检测")
+                Text(L10n.shared.t("正在检测", "Scanning"))
                     .font(.system(size: 19, weight: .semibold, design: .rounded))
                     .foregroundStyle(.white)
-                Text(engine.currentCheck.isEmpty ? "准备中…" : engine.currentCheck)
+                Text(engine.currentCheck.isEmpty ? L10n.shared.t("准备中…", "Preparing…") : engine.currentCheck)
                     .font(.system(size: 13, design: .rounded))
                     .foregroundStyle(.white.opacity(0.45))
                     .animation(.easeInOut(duration: 0.2), value: engine.currentCheck)
@@ -529,7 +548,7 @@ struct LevelCard: View {
                     Text(level.title)
                         .font(.system(size: 15, weight: .semibold, design: .rounded))
                         .foregroundStyle(.white)
-                    Text("\(level.subtitle) · \(count) 项")
+                    Text("\(level.subtitleLocalized) · \(count) " + L10n.shared.t("项", "items"))
                         .font(.system(size: 11.5, design: .rounded))
                         .foregroundStyle(.white.opacity(0.4))
                 }

@@ -9,6 +9,8 @@ import SwiftUI
 
 struct HistoryView: View {
 
+    @ObservedObject private var l10n = L10n.shared
+
     @ObservedObject private var store = HistoryStore.shared
     @State private var expandedID: UUID?
 
@@ -32,7 +34,7 @@ struct HistoryView: View {
             .padding(.bottom, 40)
         }
         .background(bg.ignoresSafeArea())
-        .navigationTitle("历史记录")
+        .navigationTitle(l10n.t("历史记录", "History"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -51,10 +53,11 @@ struct HistoryView: View {
         VStack(spacing: 12) {
             Text("📭")
                 .font(.system(size: 52))
-            Text("还没有扫描记录")
+            Text(l10n.t("还没有扫描记录", "No scans yet"))
                 .font(.system(size: 15, weight: .medium, design: .rounded))
                 .foregroundStyle(.white.opacity(0.5))
-            Text("回到「检测」跑一次，这里就会出现记录")
+            Text(l10n.t("回到「检测」跑一次，这里就会出现记录",
+                          "Run a scan and it will show up here"))
                 .font(.system(size: 12.5, design: .rounded))
                 .foregroundStyle(.white.opacity(0.3))
         }

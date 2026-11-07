@@ -9,6 +9,8 @@ import SwiftUI
 
 struct DylibListView: View {
 
+    @ObservedObject private var l10n = L10n.shared
+
     @State private var images: [LoadedImage] = []
     @State private var loading = false
 
@@ -29,7 +31,7 @@ struct DylibListView: View {
                     ProgressView()
                         .padding(40)
                 } else if images.isEmpty {
-                    Text("未枚举到映像")
+                    Text(l10n.t("未枚举到映像", "No images enumerated"))
                         .font(.system(size: 13, design: .rounded))
                         .foregroundStyle(.white.opacity(0.4))
                         .padding(40)
@@ -46,7 +48,7 @@ struct DylibListView: View {
             .padding(.bottom, 40)
         }
         .background(Color(red: 0.05, green: 0.06, blue: 0.10).ignoresSafeArea())
-        .navigationTitle("注入库清单")
+        .navigationTitle(l10n.t("注入库清单", "Loaded Images"))
         .navigationBarTitleDisplayMode(.inline)
         .onAppear(perform: reload)
         .toolbar {
@@ -62,12 +64,12 @@ struct DylibListView: View {
 
     private var summaryCard: some View {
         HStack(spacing: 0) {
-            statCell(value: "\(images.count)", label: "映像总数", color: .white.opacity(0.85))
+            statCell(value: "\(images.count)", label: l10n.t("映像总数", "Images"), color: .white.opacity(0.85))
             divider
-            statCell(value: "\(injectedCount)", label: "越狱注入",
+            statCell(value: "\(injectedCount)", label: l10n.t("越狱注入", "Injected"),
                      color: injectedCount > 0 ? Color(red: 1.0, green: 0.45, blue: 0.42) : .green)
             divider
-            statCell(value: "\(groups.count)", label: "分类", color: .white.opacity(0.6))
+            statCell(value: "\(groups.count)", label: l10n.t("分类", "Groups"), color: .white.opacity(0.6))
         }
         .padding(.vertical, 14)
         .background(
@@ -97,7 +99,7 @@ struct DylibListView: View {
             HStack(spacing: 6) {
                 Text(category.icon)
                     .font(.system(size: 12))
-                Text("\(category.rawValue) · \(items.count)")
+                Text("\(category.localizedName) · \(items.count)")
                     .font(.system(size: 12.5, weight: .semibold, design: .rounded))
                     .foregroundStyle(.white.opacity(0.55))
                 Spacer()

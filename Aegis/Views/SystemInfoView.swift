@@ -78,7 +78,7 @@ enum SystemInfoCollector {
                                   note: nil))
         }
 
-        return InfoSection(title: "设备信息", icon: "iphone", items: items)
+        return InfoSection(title: L10n.shared.t("设备信息", "Device"), icon: "iphone", items: items)
     }
 
     // MARK: 2. 代码签名
@@ -125,7 +125,7 @@ enum SystemInfoCollector {
         items.append(InfoItem(key: "getppid()", value: "\(getppid())",
                               note: "正常 App 应为 1（launchd）"))
 
-        return InfoSection(title: "代码签名", icon: "checkmark.seal", items: items)
+        return InfoSection(title: L10n.shared.t("代码签名", "Code Signing"), icon: "checkmark.seal", items: items)
     }
 
     // MARK: 3. 运行时
@@ -173,7 +173,7 @@ enum SystemInfoCollector {
                               value: set.isEmpty ? "未设置" : "\(set.count) 个",
                               note: set.first))
 
-        return InfoSection(title: "运行时", icon: "cpu", items: items)
+        return InfoSection(title: L10n.shared.t("运行时", "Runtime"), icon: "cpu", items: items)
     }
 
     // MARK: 4. 文件系统探测（lstat vs 裸 syscall）
@@ -231,7 +231,7 @@ enum SystemInfoCollector {
                               value: bootargs.isEmpty ? "（空）" : String(bootargs.prefix(120)),
                               note: ok ? nil : "sysctl 被拒绝"))
 
-        return InfoSection(title: "文件系统探测", icon: "folder", items: items)
+        return InfoSection(title: L10n.shared.t("文件系统探测", "Filesystem"), icon: "folder", items: items)
     }
 
     // MARK: 5. 进程与环境
@@ -262,13 +262,15 @@ enum SystemInfoCollector {
             items.append(InfoItem(key: "可执行路径", value: exe, note: nil))
         }
 
-        return InfoSection(title: "进程与环境", icon: "list.bullet", items: items)
+        return InfoSection(title: L10n.shared.t("进程与环境", "Process & Env"), icon: "list.bullet", items: items)
     }
 }
 
 // MARK: - 视图
 
 struct SystemInfoView: View {
+
+    @ObservedObject private var l10n = L10n.shared
 
     @State private var sections: [InfoSection] = []
     @State private var loading = true
@@ -282,7 +284,8 @@ struct SystemInfoView: View {
                 if loading {
                     ProgressView().padding(60)
                 } else {
-                    Text("以下为检测逻辑实际读取到的底层返回值，用于核对判定是否准确。")
+                    Text(l10n.t("以下为检测逻辑实际读取到的底层返回值，用于核对判定是否准确。",
+                        "Raw values the detectors actually read, for verifying verdicts."))
                         .font(.system(size: 11.5, design: .rounded))
                         .foregroundStyle(.white.opacity(0.38))
                         .frame(maxWidth: .infinity, alignment: .leading)

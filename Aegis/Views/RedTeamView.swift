@@ -9,6 +9,8 @@ import SwiftUI
 
 struct RedTeamView: View {
 
+    @ObservedObject private var l10n = L10n.shared
+
     @State private var tamperResult: RedTeam.TestResult?
     @State private var dylibResult: RedTeam.TestResult?
     @State private var running = false
@@ -22,14 +24,14 @@ struct RedTeamView: View {
 
                 testCard(
                     icon: "🩹",
-                    title: "自我篡改测试",
+                    title: l10n.t("自我篡改测试", "Self-tamper test"),
                     subtitle: "临时把 UIView.layoutSubviews 的 IMP 换成动态 block，跑 B3 看能否捕获，测完立即还原",
                     result: tamperResult
                 )
 
                 testCard(
                     icon: "📚",
-                    title: "注入库可见性",
+                    title: l10n.t("注入库可见性", "Image visibility"),
                     subtitle: "统计当前进程能枚举出多少 dylib，以及其中来自越狱路径的有几个",
                     result: dylibResult
                 )
@@ -53,11 +55,12 @@ struct RedTeamView: View {
 
     private var introCard: some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text("红队自测")
+            Text(l10n.t("红队自测", "Red Team"))
                 .font(.system(size: 15, weight: .bold, design: .rounded))
                 .foregroundStyle(.white)
 
-            Text("这些测试会主动篡改当前进程，用来验证检测器本身是否有效。所有改动在测试结束后立即还原，不会影响 App 正常运行。")
+            Text(l10n.t("这些测试会主动篡改当前进程，用来验证检测器本身是否有效。所有改动在测试结束后立即还原，不会影响 App 正常运行。",
+                  "These tests tamper with the current process to validate the detectors themselves. Everything is restored immediately after."))
                 .font(.system(size: 12, design: .rounded))
                 .foregroundStyle(.white.opacity(0.45))
                 .fixedSize(horizontal: false, vertical: true)
@@ -142,7 +145,7 @@ struct RedTeamView: View {
                     Image(systemName: "bolt.fill")
                         .font(.system(size: 14, weight: .semibold))
                 }
-                Text(running ? "测试中…" : "开始自测")
+                Text(running ? l10n.t("测试中…", "Running…") : l10n.t("开始自测", "Run tests"))
                     .font(.system(size: 15.5, weight: .semibold, design: .rounded))
             }
             .foregroundStyle(.black)
@@ -170,7 +173,8 @@ struct RedTeamView: View {
     private var warningCard: some View {
         HStack(alignment: .top, spacing: 8) {
             Text("⚠️").font(.system(size: 14))
-            Text("B3 未能捕获自我篡改，说明 IMP 归属校验存在盲点。建议提高该等级的权重或补充检测手段。")
+            Text(l10n.t("B3 未能捕获自我篡改，说明 IMP 归属校验存在盲点。建议提高该等级的权重或补充检测手段。",
+                          "B3 missed the self-tamper. The IMP provenance check has a blind spot."))
                 .font(.system(size: 11.5, design: .rounded))
                 .foregroundStyle(Color(red: 1.0, green: 0.72, blue: 0.45))
                 .fixedSize(horizontal: false, vertical: true)
