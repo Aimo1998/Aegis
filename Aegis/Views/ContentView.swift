@@ -21,7 +21,7 @@ enum AppMode: String, CaseIterable, Identifiable {
         case .detect:  return "shield.lefthalf.filled"
         case .dylibs:  return "square.stack.3d.up"
         case .history: return "clock.arrow.circlepath"
-        case .redteam: return "flask"
+        case .redteam: return "testtube.2"
         }
     }
 
