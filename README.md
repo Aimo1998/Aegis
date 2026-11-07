@@ -19,6 +19,7 @@
 - **计时攻击检测**：用 `mach_absolute_time` 采样，返回值能伪造，耗时伪造不了
 - **IMP 归属校验**：拿关键 selector 的 IMP 反查 `dladdr`，判断方法有没有被重定向到越狱路径下的 dylib
 - **零第三方依赖**：纯 SwiftUI + Darwin + DeviceCheck
+- **系统信息诊断页**：把所有检测依赖的底层返回值（sysctl / csops / lstat-vs-syscall / 挂载表 / 进程表）原样列出，便于核对判定是否准确
 - **底层全走 C shim**：`fork` / `ptrace` / `_dyld_*` / `getfsstat` 在 Swift 里被标 unavailable 或签名难对齐，统一由 `AegisShim.c` 封装
 
 ---
@@ -147,6 +148,7 @@ uicache -p /var/jb/Applications/Aegis.app
 | 📚 **注入库** | 枚举全部已加载 dylib，按来源分 6 类，越狱注入标红排最前 |
 | 🕒 **历史** | 每次扫描自动存档（最多 60 条），可对比上一条同等级记录，标出新增失败 / 已恢复项 |
 | 🧪 **红队自测** | 主动替换自身 IMP 验证 B3 灵敏度；统计注入库可见性 |
+| 🧾 **系统信息** | 底层返回值诊断：sysctl、csflags 位解析、lstat 与裸 syscall 对比、挂载表、进程表 |
 
 ---
 
@@ -193,7 +195,8 @@ RootHide 一类方案能在返回值和文件属性上做手脚，但**无法同
 1. **A6 App Attest** 需付费开发者账号的 `com.apple.developer.devicecheck.appattest-environment` entitlement；免费签环境下 `isSupported` 为 false，该项自动跳过
 2. **C2 URL Scheme** 必须在 `Info.plist` 的 `LSApplicationQueriesSchemes` 中声明，否则 `canOpenURL` 恒为 false
 3. **计时攻击**依赖设备负载，高负载下可能出现假阳性，阈值（4x / 0.15x）可按实际环境调整
-4. 检测结果仅供参考，**单项异常不必然等同于环境被入侵**，建议结合整体命中数量判断
+4. **C5 硬件指纹**只认「明确的模拟器架构」（`x86_64` / `arm64` / `i386`）；识别不出的机型一律视为真机，优先避免假阳性
+5. 检测结果仅供参考，**单项异常不必然等同于环境被入侵**，建议结合整体命中数量判断
 
 ---
 
@@ -212,14 +215,21 @@ Aegis/
     ├── Aegis-Bridging-Header.h
     ├── Assets.xcassets/AppIcon.appiconset/
     ├── Detector/
-    │   ├── Models.swift             # 检测项模型 + 结果聚合
+    │   ├── Models.swift             # 检测项模型 + 结果聚合 + 风险评分
     │   ├── LevelC.swift             # 🔵 5 项
     │   ├── LevelB.swift             # 🟡 6 项
     │   ├── LevelA.swift             # 🔴 6 项
-    │   └── ScanEngine.swift         # 扫描调度
+    │   ├── ScanEngine.swift         # 扫描调度
+    │   ├── DylibScanner.swift       # 已加载映像枚举与分类
+    │   ├── HistoryStore.swift       # 历史记录 + 权重/绕过元数据
+    │   └── RedTeam.swift            # 自我篡改与注入可见性测试
     └── Views/
-        ├── ContentView.swift        # 首页 + 扫描中
-        └── ResultView.swift         # 结果页
+        ├── ContentView.swift        # 顶栏 + 汉堡菜单 + 首页 + 扫描中
+        ├── ResultView.swift         # 结果页（评分卡 + 展开证据/绕过）
+        ├── DylibListView.swift      # 注入库清单
+        ├── HistoryView.swift        # 历史记录与变化对比
+        ├── RedTeamView.swift        # 红队自测
+        └── SystemInfoView.swift     # 系统信息诊断
 ```
 
 ---
