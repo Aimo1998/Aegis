@@ -174,6 +174,20 @@ extension DetectorCatalog {
         "B6": DetectorMeta(weight: 10,
             bypass: "守护进程改名并隔离到独立命名空间"),
 
+        "B7": DetectorMeta(weight: 12,
+            bypass: "符号链接可由 RootHide 换成 firmlink 或直接不落盘，lstat 只会看到普通目录"),
+        "B8": DetectorMeta(weight: 15,
+            bypass: "把 EACCES/EPERM 统一改写为 ENOENT，需要 Hook 沙盒判定，成本高"),
+        "B9": DetectorMeta(weight: 6,
+            bypass: "声明缺失是本机配置问题，无法通过修改环境绕过，只能补全 Info.plist"),
+
+        "A7": DetectorMeta(weight: 20,
+            bypass: "挂载表由内核维护，用户态只能隐藏条目，无法伪造 flags"),
+        "A8": DetectorMeta(weight: 22,
+            bypass: "需同时 Hook dyld 与 dladdr 且返回同一路径，任一处不一致即暴露"),
+        "A9": DetectorMeta(weight: 18,
+            bypass: "csops 是私有 syscall，Hook 后极难保持多次调用完全一致"),
+
         "A1": DetectorMeta(weight: 25,
             bypass: "必须同时 Hook libc 与裸 syscall 且结果完全一致，极易露馅"),
         "A2": DetectorMeta(weight: 20,

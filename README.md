@@ -2,14 +2,14 @@
 
 [Click me to switch English.](README_EN.md)
 
-> 一个纯本地的 iOS 越狱环境检测 App —— 三级递进，17 项检测，覆盖从传统有根越狱到 RootHide 级别的高级隐藏。
+> 一个纯本地的 iOS 越狱环境检测 App —— 三级递进，23 项检测，覆盖从传统有根越狱到 RootHide 级别的高级隐藏。
 
 **全程离线运行，不联网、不上传任何数据。**
 
 ```
 🔵 C 级 · 基础特征          5 项
-🟡 B 级 · 现代无根与注入     6 项
-🔴 A 级 · 深度对抗与底层校验  6 项
+🟡 B 级 · 现代无根与注入     9 项
+🔴 A 级 · 深度对抗与底层校验  9 项
 ```
 
 ---
@@ -38,7 +38,7 @@
 | C4 | 环境变量审查 | `DYLD_INSERT_LIBRARIES` / `DYLD_FRAMEWORK_PATH` 等 8 个变量，判断是否含非系统路径 |
 | C5 | 模拟器与硬件指纹 | `TARGET_OS_SIMULATOR` + `hw.machine` + Secure Enclave / 生物识别硬件存在性 |
 
-### 🟡 B 级 · 现代无根与注入（6 项）
+### 🟡 B 级 · 现代无根与注入（9 项）
 
 | ID | 检测项 | 实现要点 |
 |---|---|---|
@@ -48,8 +48,11 @@
 | B4 | 调试与反注入 | `sysctl P_TRACED` + `PT_DENY_ATTACH` 自检 + Frida 端口 27042/27043/27044 + `gum_*` 符号 |
 | B5 | RWX 内存段 | `vm_region_64` 遍历，挑出 W+X 且不归属任何已加载映像的页 |
 | B6 | 进程链检测 | `sysctl KERN_PROC_ALL` 拉全进程表，匹配 jailbreakd / linjector / frida-server / dropbear 等 19 个特征 |
+| B7 | 符号链接残留 | `lstat`（不跟随）检查 `/var/jb`、`/.jbroot` 等是否为符号链接，并 `readlink` 读出目标 |
+| B8 | 权限异常探测 | 逐个路径取 `errno`，区分「不存在(ENOENT)」与「存在但被拒(EACCES/EPERM)」 |
+| B9 | Scheme 声明自检 | 检查 `LSApplicationQueriesSchemes` 是否覆盖 10 个越狱 Scheme，标出 C2 的盲区 |
 
-### 🔴 A 级 · 深度对抗与底层校验（6 项）
+### 🔴 A 级 · 深度对抗与底层校验（9 项）
 
 | ID | 检测项 | 实现要点 |
 |---|---|---|
@@ -59,6 +62,9 @@
 | A4 | 计时攻击检测 | `mach_absolute_time` 采样 300 次，对比正常路径 / 越狱路径 / 纯 syscall 基线，>4x 或 <0.15x 判为可疑 |
 | A5 | 防篡改与指针完整性 | 关键 API 的函数地址是否仍在合法映像内（内联 Hook / PAC 伪造），`dladdr` 交叉验证来源库 |
 | A6 | App Attest 完整性 | `DCAppAttestService.generateKey`，无 entitlement 时自动跳过 |
+| A7 | 挂载点深度分析 | `getfsstat` + `statfs` 检查根文件系统可写性、`/System/Library` 挂载 flags、挂载点总数异常 |
+| A8 | 映像路径一致性 | 同一映像分别用 `_dyld_get_image_name` 与 `dladdr` 解析，比对路径是否分歧 |
+| A9 | csops 完整性 | 连调 3 次 `csops(CS_OPS_STATUS)`，返回值不稳定即判 Hook；`CS_VALID` 必须置位 |
 
 ---
 
@@ -102,7 +108,7 @@ uicache -p /var/jb/Applications/Aegis.app
 
 ## 风险评分
 
-17 项检测各有权重（合计 **243 分**），命中项权重按比例换算成 0–100 的风险分：
+23 项检测各有权重（合计 **336 分**），命中项权重按比例换算成 0–100 的风险分：
 
 | 分数 | 等级 | 含义 |
 |---|---|---|
@@ -120,6 +126,9 @@ uicache -p /var/jb/Applications/Aegis.app
 | C4 | 10 | B4 | 12 | A4 | 22 |
 | C5 | 5 | B5 | 15 | A5 | 25 |
 | — | — | B6 | 10 | A6 | 10 |
+| — | — | B7 | 12 | A7 | 20 |
+| — | — | B8 | 15 | A8 | 22 |
+| — | — | B9 | 6 | A9 | 18 |
 
 > 判定仍沿用「任一命中即 😢」，评分只用于表达严重程度。若要按分数阈值判定，改 `ScanReport.isJailbroken` 即可。
 

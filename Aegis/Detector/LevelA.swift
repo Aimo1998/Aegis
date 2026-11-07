@@ -28,7 +28,10 @@ enum LevelA {
         kernelStateCheck,
         timingAttackCheck,
         antiTamperCheck,
-        appAttestCheck
+        appAttestCheck,
+        mountAnalysisCheck,
+        imagePathConsistencyCheck,
+        csopsIntegrityCheck
     ]
 
     // MARK: A1 · API 交叉验证
@@ -303,4 +306,140 @@ enum LevelA {
             #endif
         }
     )
+    // MARK: A7 · 挂载点深度分析
+
+    static let mountAnalysisCheck = Detector(
+        id: "A7",
+        level: .a,
+        name: "挂载点深度分析",
+        detail: "读取 getfsstat 挂载表，检查根文件系统是否被改成可写、是否存在非标准的引导镜像挂载点、以及挂载点数量是否异常。",
+        run: {
+            var issues: [String] = []
+
+            // 1. 根文件系统正常应为只读
+            if aegis_root_writable() {
+                issues.append("根文件系统 / 可写（正常应为只读）")
+            }
+
+            // 2. 关键挂载点 flags
+            let keyPaths = ["/", "/private/var", "/private/preboot", "/System/Library"]
+            for path in keyPaths {
+                var flags: UInt32 = 0
+                let ok = path.withCString { cstr -> Bool in
+                    aegis_mount_flags(cstr, &flags)
+                }
+                guard ok else { continue }
+                // MNT_RDONLY = 0x1
+                if path == "/System/Library" && (flags & 0x1) == 0 {
+                    issues.append("/System/Library 可写")
+                }
+            }
+
+            // 3. 挂载表里的可疑项
+            if let mounts = aegisFetchMounts() {
+                for m in mounts {
+                    let lower = m.lowercased()
+                    if lower.contains("jbroot") || lower.contains("/var/jb")
+                        || lower.contains("procursus") || lower.contains("libhooker") {
+                        issues.append("异常挂载：\(m)")
+                        if issues.count >= 4 { break }
+                    }
+                }
+            }
+
+            // 4. 挂载点总数异常（正常 20~35）
+            let n = Int(aegis_mount_count())
+            if n > 45 {
+                issues.append("挂载点数量异常：\(n) 个")
+            }
+
+            guard !issues.isEmpty else { return nil }
+            return issues.prefix(4).joined(separator: "；")
+        }
+    )
+
+    // MARK: A8 · 映像路径一致性
+
+    static let imagePathConsistencyCheck = Detector(
+        id: "A8",
+        level: .a,
+        name: "映像路径一致性",
+        detail: "对同一批已加载映像，分别用 _dyld_get_image_name 和 dladdr 解析路径，比对两者是否一致。Frida / 内存注入常让两条路径出现分歧。",
+        run: {
+            let rawCount = aegis_dyld_image_count()
+            guard rawCount > 0 else { return nil }
+            let count = Int(rawCount)
+            let limit = min(count, 220)
+
+            var mismatches: [String] = []
+
+            for i in 0..<limit {
+                guard let cname = aegis_dyld_image_name(Int32(i)) else { continue }
+                let dyldPath = String(cString: cname)
+                guard !dyldPath.isEmpty else { continue }
+
+                guard let hdr = aegis_dyld_image_header(Int32(i)) else { continue }
+
+                var info = Dl_info()
+                guard dladdr(hdr, &info) != 0, let fname = info.dli_fname else { continue }
+                let dlPath = String(cString: fname)
+                guard !dlPath.isEmpty else { continue }
+
+                if dyldPath != dlPath {
+                    let short = (dyldPath as NSString).lastPathComponent
+                    mismatches.append("\(short): dyld=\(dyldPath) dladdr=\(dlPath)")
+                    if mismatches.count >= 3 { break }
+                }
+            }
+
+            guard !mismatches.isEmpty else { return nil }
+            return mismatches.joined(separator: "；")
+        }
+    )
+
+    // MARK: A9 · csops 完整性
+
+    static let csopsIntegrityCheck = Detector(
+        id: "A9",
+        level: .a,
+        name: "csops 完整性",
+        detail: "连续多次调用 csops(CS_OPS_STATUS)，比对每次返回的 csflags 是否完全一致，并校验 CS_VALID 必须置位。第一次调用后的返回值若发生变化，通常说明 csops 被 Hook 伪造。",
+        run: {
+            var samples: [UInt32] = []
+            var callErrs: [Int32] = []
+
+            for _ in 0..<3 {
+                var flags: UInt32 = 0
+                let r = withUnsafeMutablePointer(to: &flags) { p -> Int32 in
+                    aegis_csops(UInt32(getpid()), 0, UnsafeMutableRawPointer(p), 4)
+                }
+                callErrs.append(r)
+                samples.append(flags)
+            }
+
+            // 调用本身失败
+            if let first = callErrs.first, first != 0 {
+                let allSame = callErrs.allSatisfy { $0 == first }
+                if allSame {
+                    return nil          // 稳定失败，可能是权限限制，不判越狱
+                }
+                return "csops 返回值不稳定：\(callErrs)（疑似被 Hook）"
+            }
+
+            // 返回值不稳定
+            if Set(samples).count > 1 {
+                let hex = samples.map { "0x" + String($0, radix: 16) }.joined(separator: ", ")
+                return "csops 结果不一致：\(hex)（疑似被 Hook）"
+            }
+
+            // CS_VALID = 0x1 必须置位
+            let flags = samples[0]
+            if (flags & 0x1) == 0 {
+                return "CS_VALID 未置位（csflags=0x\(String(flags, radix: 16))）"
+            }
+
+            return nil
+        }
+    )
+
 }

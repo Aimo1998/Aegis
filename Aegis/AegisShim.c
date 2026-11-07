@@ -262,3 +262,35 @@ int aegis_list_process_names(char *out, size_t outSize) {
     out[written] = '\0';
     return (int)written;
 }
+
+
+// ===== 新增：挂载点与映像分析 =====
+
+/// 根文件系统是否可写（正常 iOS 应为只读）
+bool aegis_root_writable(void) {
+    struct statfs sfs;
+    if (statfs("/", &sfs) != 0) return false;
+    return (sfs.f_flags & MNT_RDONLY) == 0;
+}
+
+/// 返回指定挂载点的 flags，成功写入 *outFlags 返回 true
+bool aegis_mount_flags(const char *path, uint32_t *outFlags) {
+    if (!path || !outFlags) return false;
+    struct statfs sfs;
+    if (statfs(path, &sfs) != 0) return false;
+    *outFlags = sfs.f_flags;
+    return true;
+}
+
+/// 取指定索引映像的 mach header 地址
+void *aegis_dyld_image_header(int index) {
+    uint32_t count = _dyld_image_count();
+    if (index < 0 || (uint32_t)index >= count) return NULL;
+    return (void *)_dyld_get_image_header((uint32_t)index);
+}
+
+/// 统计挂载点总数
+int aegis_mount_count(void) {
+    int n = getfsstat(NULL, 0, MNT_NOWAIT);
+    return n > 0 ? n : 0;
+}

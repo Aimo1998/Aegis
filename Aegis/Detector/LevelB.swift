@@ -20,7 +20,10 @@ enum LevelB {
         uiTamperCheck,
         debuggerCheck,
         rwxMemoryCheck,
-        processChainCheck
+        processChainCheck,
+        symlinkResidueCheck,
+        permissionProbeCheck,
+        schemeDeclareCheck
     ]
 
     // MARK: B1 · 无根越狱路径探测
@@ -317,4 +320,109 @@ func aegisFetchProcesses() -> [String]? {
     let raw = String(cString: buf)
     let list = raw.split(separator: "\n").map(String.init)
     return list.isEmpty ? nil : list
+    // MARK: B7 · 符号链接本体
+
+    static let symlinkResidueCheck = Detector(
+        id: "B7",
+        level: .b,
+        name: "符号链接残留",
+        detail: "用 lstat（不跟随链接）检查 /var/jb、/.jbroot 等路径本身是否为符号链接，并读取链接目标。常规 stat 会跟随链接，检测不到这种残留。",
+        run: {
+            var hits: [String] = []
+
+            let targets = [
+                "/var/jb", "/.jbroot", "/private/var/jb",
+                "/usr/lib/substrate", "/usr/lib/libsubstrate.dylib",
+                "/Library/MobileSubstrate", "/Library/TweakInject",
+                "/var/lib/dpkg", "/etc/apt"
+            ]
+
+            for path in targets {
+                var st = Darwin.stat()
+                guard lstat(path, &st) == 0 else { continue }
+                let mode = st.st_mode & S_IFMT
+                guard mode == S_IFLNK else { continue }
+
+                var buf = [CChar](repeating: 0, count: 1024)
+                let n = readlink(path, &buf, buf.count - 1)
+                let dest: String
+                if n > 0 {
+                    dest = String(cString: buf)
+                } else {
+                    dest = "?"
+                }
+                hits.append("\(path) → \(dest)")
+            }
+
+            guard !hits.isEmpty else { return nil }
+            return hits.prefix(3).joined(separator: "；")
+        }
+    )
+
+    // MARK: B8 · 权限异常探测
+
+    static let permissionProbeCheck = Detector(
+        id: "B8",
+        level: .b,
+        name: "权限异常探测",
+        detail: "对越狱特征路径逐个调用 lstat 并记录 errno。区分「路径不存在（ENOENT）」与「存在但访问被拒（EACCES / EPERM）」——后者说明路径真实存在，只是被沙盒或 Hook 拦住了访问。",
+        run: {
+            var denied: [String] = []
+            var oddly: [String] = []
+
+            let probes = [
+                "/var/jb", "/.jbroot", "/private/preboot",
+                "/Library/MobileSubstrate", "/Library/TweakInject",
+                "/usr/lib/libsubstrate.dylib", "/usr/lib/libhooker.dylib",
+                "/usr/lib/libellekit.dylib", "/bin/bash", "/usr/bin/ssh"
+            ]
+
+            for path in probes {
+                var st = Darwin.stat()
+                errno = 0
+                let r = lstat(path, &st)
+                if r == 0 { continue }                 // 已由 B1 负责
+                let e = errno
+                if e == EACCES || e == EPERM {
+                    denied.append("\(path)(errno=\(e))")
+                } else if e != ENOENT && e != 0 {
+                    oddly.append("\(path)(errno=\(e))")
+                }
+            }
+
+            var parts: [String] = []
+            if !denied.isEmpty {
+                parts.append("访问被拒：" + denied.prefix(3).joined(separator: "、"))
+            }
+            if !oddly.isEmpty {
+                parts.append("异常 errno：" + oddly.prefix(3).joined(separator: "、"))
+            }
+            guard !parts.isEmpty else { return nil }
+            return parts.joined(separator: "；")
+        }
+    )
+
+    // MARK: B9 · Scheme 声明自检
+
+    static let schemeDeclareCheck = Detector(
+        id: "B9",
+        level: .b,
+        name: "Scheme 声明自检",
+        detail: "canOpenURL 只会对 Info.plist 中 LSApplicationQueriesSchemes 声明过的 Scheme 返回真实结果，未声明的一律返回 false。本项检查哪些越狱 Scheme 没有声明，标注出 C2 的检测盲区。",
+        run: {
+            let needed = [
+                "cydia", "sileo", "zbra", "zebra", "filza",
+                "activator", "undecimus", "sbsettings",
+                "trollstore", "procursus"
+            ]
+
+            let declared = (Bundle.main.object(forInfoDictionaryKey: "LSApplicationQueriesSchemes") as? [String]) ?? []
+            let declaredLower = Set(declared.map { $0.lowercased() })
+
+            let missing = needed.filter { !declaredLower.contains($0) }
+            guard !missing.isEmpty else { return nil }
+            return "未声明：\(missing.joined(separator: ", "))（这些 Scheme 无法探测，C2 存在盲区）"
+        }
+    )
+
 }

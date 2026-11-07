@@ -66,5 +66,12 @@ int aegis_mount_points(char *out, size_t outSize);
 /// 取全部进程名，写入 out（'\n' 分隔），返回字节数
 int aegis_list_process_names(char *out, size_t outSize);
 
+
+// ===== 挂载点与映像分析 =====
+bool aegis_root_writable(void);
+bool aegis_mount_flags(const char *path, uint32_t *outFlags);
+void *aegis_dyld_image_header(int index);
+int  aegis_mount_count(void);
+
 #endif /* AegisShim_h */
 
