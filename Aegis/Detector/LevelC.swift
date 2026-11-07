@@ -104,7 +104,7 @@ enum LevelC {
         "filza://",
         "activator://",
         "undecimus://",
-        "sbSettings://",
+        "sbsettings://",
         "trollstore://",
         "procursus://"
     ]
@@ -144,11 +144,13 @@ enum LevelC {
             var reasons: [String] = []
 
             let token = UUID().uuidString
+            // 注意：不能探测 /tmp —— iOS 上 /tmp 是指向 App 自己沙盒 tmp 的符号链接，
+            // 写入必然成功，会造成假阳性。
             let targets = [
                 "/private/jailbreak_test_\(token).txt",
                 "/private/var/tmp/jailbreak_test_\(token).txt",
                 "/var/jb/.aegis_probe_\(token)",
-                "/tmp/aegis_probe_\(token)"
+                "/usr/lib/.aegis_probe_\(token)"
             ]
             for path in targets {
                 do {

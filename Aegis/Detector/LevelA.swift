@@ -108,13 +108,17 @@ enum LevelA {
 
             var issues: [String] = []
 
-            if (flags & CS_VALID) == 0 { issues.append("CS_VALID 未置位") }
-            if (flags & CS_DEBUGGED) != 0 { issues.append("CS_DEBUGGED 已置位") }
-            if (flags & CS_HARD) == 0 { issues.append("CS_HARD 缺失") }
-            if (flags & CS_KILL) == 0 { issues.append("CS_KILL 缺失") }
-            if (flags & CS_RESTRICT) == 0 { issues.append("CS_RESTRICT 缺失") }
-            if (flags & CS_PLATFORM) == 0 && (flags & CS_INSTALLER) == 0 {
-                issues.append("无 CS_PLATFORM/CS_INSTALLER（疑似 ad-hoc 入 TrustCache）")
+            // 只把「内核本应强制、无法被用户态篡改」的位缺失当作异常。
+            // CS_RESTRICT / CS_PLATFORM / CS_INSTALLER 缺失在 ad-hoc 签名（ldid -S）下
+            // 属正常现象，CS_DEBUGGED 也常见于开发者证书，均不作为失败依据。
+            if (flags & CS_VALID) == 0 {
+                issues.append("CS_VALID 未置位（签名状态异常）")
+            }
+            if (flags & CS_HARD) == 0 {
+                issues.append("CS_HARD 缺失（页面可被动态改写）")
+            }
+            if (flags & CS_KILL) == 0 {
+                issues.append("CS_KILL 缺失（违规时不会被内核终止）")
             }
 
             guard !issues.isEmpty else { return nil }

@@ -152,9 +152,12 @@ enum LevelB {
                 var info = Dl_info()
                 let ptr = unsafeBitCast(imp, to: UnsafeRawPointer.self)
 
-                // dladdr 失败 = IMP 不归属任何已加载映像（动态生成的 block / 内存中注入的代码）
+                // dladdr 拿不到路径时（dyld 共享缓存常见），退回地址归属判断，
+                // 避免把「只是没名字」误判成「被 Hook」
                 guard dladdr(ptr, &info) != 0, let fname = info.dli_fname else {
-                    hits.append("\(className) -\(selectorName) → IMP 不归属任何映像")
+                    if !aegis_address_in_image(UInt(bitPattern: ptr)) {
+                        hits.append("\(className) -\(selectorName) → IMP 不在任何已加载映像内")
+                    }
                     continue
                 }
 
