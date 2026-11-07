@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct ResultView: View {
 
@@ -14,8 +15,8 @@ struct ResultView: View {
     @ObservedObject var engine: ScanEngine
     @ObservedObject private var l10n = L10n.shared
 
-    @State private var showShare = false
-    @State private var shareText = ""
+    @State private var payload: SharePayload?
+    @State private var toast: String?
 
     var body: some View {
         ScrollView {
@@ -202,22 +203,46 @@ struct ResultView: View {
 
     private var actionRow: some View {
         HStack(spacing: 10) {
-            shareButton(icon: "doc.text", title: "完整报告") {
-                shareText = report.exportText()
-                showShare = true
+            shareButton(icon: "doc.text", title: L10n.shared.t("完整报告", "Report")) {
+                emit("Aegis-Report", report.exportText())
             }
             shareButton(icon: "curlybraces", title: "JSON") {
-                shareText = report.exportJSON()
-                showShare = true
+                emit("Aegis-Report.json", report.exportJSON())
             }
-            shareButton(icon: "text.bubble", title: "摘要") {
-                shareText = report.exportSummary()
-                showShare = true
+            shareButton(icon: "text.bubble", title: L10n.shared.t("摘要", "Summary")) {
+                emit("Aegis-Summary", report.exportSummary())
             }
         }
-        .sheet(isPresented: $showShare) {
-            ShareSheet(text: shareText)
+        .sheet(item: $payload) { p in
+            ShareSheet(text: p.text)
                 .presentationDetents([.medium, .large])
+        }
+        .overlay(alignment: .top) {
+            if let t = toast {
+                ToastView(text: t)
+                    .padding(.top, 8)
+                    .allowsHitTesting(false)
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: toast)
+    }
+
+    /// 复制到剪贴板 + 弹出分享面板（双保险）
+    private func emit(_ title: String, _ text: String) {
+        guard !text.isEmpty else {
+            toast = L10n.shared.t("导出内容为空", "Nothing to export")
+            clearToastLater()
+            return
+        }
+        UIPasteboard.general.string = text
+        toast = L10n.shared.t("已复制 \(text.count) 字符", "Copied \(text.count) chars")
+        clearToastLater()
+        payload = SharePayload(title: title, text: text)
+    }
+
+    private func clearToastLater() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
+            toast = nil
         }
     }
 
@@ -279,6 +304,14 @@ struct ResultView: View {
 }
 
 // MARK: - 单行
+
+/// 分享载荷：把文本和「触发」绑定在一起，
+/// 避免 @State 同一帧更新时 sheet 抓到空字符串
+struct SharePayload: Identifiable {
+    let id = UUID()
+    let title: String
+    let text: String
+}
 
 struct CheckRow: View {
 
