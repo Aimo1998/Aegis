@@ -19,7 +19,7 @@ extension DetectorCatalog {
         "B1": "Probes /var/jb, /.jbroot and other rootless mount points with the raw SYS_lstat, then scans the getfsstat mount table for jbroot entries.",
         "B2": "Walks _dyld_image_count to enumerate every loaded dylib, matching ElleKit / MobileSubstrate / Substitute / libhooker / systemhook and 11 more signatures.",
         "B3": "Resolves the IMPs of key methods on UIApplication / UIView / UISwitch, then uses dladdr to find which image they belong to. An IMP owned by a jailbreak dylib means the method was hooked.",
-        "B4": "Checks the sysctl P_TRACED flag, the ptrace(PT_DENY_ATTACH) return value, and probes Frida's default ports 27042-27044 plus gum_* symbols.",
+        "B4": "Checks the sysctl P_TRACED flag, the ptrace(PT_DENY_ATTACH) return value, and looks for gum_* symbols left by Frida. Port scanning moved to B12 so one signal is not weighted twice.",
         "B5": "Walks mach_vm_region counting pages that are both writable and executable while not belonging to any loaded image — a typical code-injection trace.",
         "B6": "Pulls the full process list via sysctl KERN_PROC_ALL and matches jailbreak daemons (jailbreakd, linjector, frida-server, dropbear … 19 signatures).",
         "B7": "Uses lstat (no follow) to check whether /var/jb or /.jbroot is itself a symlink, and reads the target. Links pointing into /private/preboot are Dopamine's normal layout and are skipped.",
