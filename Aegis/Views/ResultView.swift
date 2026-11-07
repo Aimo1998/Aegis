@@ -72,7 +72,7 @@ struct ResultView: View {
     private var riskCard: some View {
         VStack(spacing: 9) {
             HStack(alignment: .firstTextBaseline, spacing: 7) {
-                Text("风险评分")
+                Text(l10n.t("风险评分", "Risk score"))
                     .font(.system(size: 12.5, weight: .medium, design: .rounded))
                     .foregroundStyle(.white.opacity(0.42))
 
@@ -113,7 +113,8 @@ struct ResultView: View {
             .frame(height: 6)
 
             HStack {
-                Text("命中权重 \(report.hitWeight) / \(report.totalWeight)")
+                Text(l10n.t("命中权重 \(report.hitWeight) / \(report.totalWeight)",
+                            "Weight \(report.hitWeight) / \(report.totalWeight)"))
                     .font(.system(size: 10.5, design: .rounded))
                     .foregroundStyle(.white.opacity(0.28))
                 Spacer()
@@ -134,9 +135,9 @@ struct ResultView: View {
 
     private var statBar: some View {
         HStack(spacing: 0) {
-            statCell(value: "\(report.passedCount)", label: "通过", color: Color(red: 0.30, green: 0.82, blue: 0.50))
+            statCell(value: "\(report.passedCount)", label: l10n.t("通过", "Passed"), color: Color(red: 0.30, green: 0.82, blue: 0.50))
             divider
-            statCell(value: "\(report.triggeredCount)", label: "未通过", color: report.tint)
+            statCell(value: "\(report.triggeredCount)", label: l10n.t("未通过", "Failed"), color: report.tint)
             divider
             statCell(value: String(format: "%.2fs", report.duration), label: "耗时", color: .white.opacity(0.75))
         }
@@ -274,7 +275,7 @@ struct ResultView: View {
             HStack(spacing: 9) {
                 Image(systemName: "arrow.clockwise")
                     .font(.system(size: 15, weight: .semibold))
-                Text("重新检测")
+                Text(l10n.t("重新检测", "Rescan"))
                     .font(.system(size: 16, weight: .semibold, design: .rounded))
             }
             .foregroundStyle(.white)
@@ -395,17 +396,17 @@ struct CheckRow: View {
 
             if expanded {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(result.detail)
+                    Text(result.localizedDetail)
                         .font(.system(size: 12, weight: .regular, design: .rounded))
                         .foregroundStyle(.white.opacity(0.52))
                         .fixedSize(horizontal: false, vertical: true)
 
-                    if !result.bypass.isEmpty {
+                    if !result.localizedBypass.isEmpty {
                         HStack(alignment: .top, spacing: 6) {
-                            Text("绕过")
+                            Text(l10n.t("绕过", "Bypass"))
                                 .font(.system(size: 10.5, weight: .bold, design: .rounded))
                                 .foregroundStyle(.white.opacity(0.35))
-                            Text(result.bypass)
+                            Text(result.localizedBypass)
                                 .font(.system(size: 11.5, design: .rounded))
                                 .foregroundStyle(Color(red: 0.55, green: 0.75, blue: 1.0).opacity(0.85))
                                 .fixedSize(horizontal: false, vertical: true)
@@ -414,7 +415,7 @@ struct CheckRow: View {
 
                     if let ev = result.evidence {
                         HStack(alignment: .top, spacing: 6) {
-                            Text("证据")
+                            Text(l10n.t("证据", "Evidence"))
                                 .font(.system(size: 10.5, weight: .bold, design: .rounded))
                                 .foregroundStyle(.white.opacity(0.35))
                             Text(ev)

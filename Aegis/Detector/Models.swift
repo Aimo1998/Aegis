@@ -115,6 +115,20 @@ struct CheckResult: Identifiable {
 
     /// 该类检测的绕过思路
     var bypass: String { DetectorCatalog.bypass(for: id) }
+
+    /// 按当前语言显示的原理说明
+    var localizedDetail: String {
+        guard L10n.shared.isEnglish,
+              let en = DetectorCatalog.detailEN[id] else { return detail }
+        return en
+    }
+
+    /// 按当前语言显示的绕过思路
+    var localizedBypass: String {
+        guard L10n.shared.isEnglish,
+              let en = DetectorCatalog.bypassEN[id] else { return bypass }
+        return en
+    }
 }
 
 /// 一次完整扫描的聚合结果
@@ -131,7 +145,8 @@ struct ScanReport {
     var isJailbroken: Bool { triggeredCount > 0 }
 
     var headline: String {
-        isJailbroken ? "检测到越狱环境" : "未检测到越狱环境"
+        isJailbroken ? L10n.shared.t("检测到越狱环境", "Jailbreak detected")
+                     : L10n.shared.t("未检测到越狱环境", "No jailbreak detected")
     }
 
     var emoji: String {
@@ -172,15 +187,15 @@ struct ScanReport {
     var riskTier: RiskTier {
         switch riskScore {
         case 0:
-            return RiskTier(label: "安全", color: Color(red: 0.20, green: 0.78, blue: 0.45))
+            return RiskTier(label: L10n.shared.t("安全", "Safe"), color: Color(red: 0.20, green: 0.78, blue: 0.45))
         case 1...25:
-            return RiskTier(label: "低风险", color: Color(red: 0.55, green: 0.78, blue: 0.50))
+            return RiskTier(label: L10n.shared.t("低风险", "Low"), color: Color(red: 0.55, green: 0.78, blue: 0.50))
         case 26...50:
-            return RiskTier(label: "中风险", color: Color(red: 0.95, green: 0.75, blue: 0.30))
+            return RiskTier(label: L10n.shared.t("中风险", "Medium"), color: Color(red: 0.95, green: 0.75, blue: 0.30))
         case 51...75:
-            return RiskTier(label: "高风险", color: Color(red: 0.98, green: 0.55, blue: 0.30))
+            return RiskTier(label: L10n.shared.t("高风险", "High"), color: Color(red: 0.98, green: 0.55, blue: 0.30))
         default:
-            return RiskTier(label: "极高风险", color: Color(red: 0.95, green: 0.30, blue: 0.30))
+            return RiskTier(label: L10n.shared.t("极高风险", "Critical"), color: Color(red: 0.95, green: 0.30, blue: 0.30))
         }
     }
 }
