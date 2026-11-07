@@ -284,6 +284,7 @@ struct CheckRow: View {
     let result: CheckResult
     var onRerun: (() -> Void)? = nil
 
+    @ObservedObject private var l10n = L10n.shared
     @State private var expanded: Bool = false
     @State private var rerunning: Bool = false
 

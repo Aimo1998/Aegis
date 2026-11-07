@@ -21,6 +21,19 @@ private let CS_DEBUGGED: UInt32  = 0x10000000
 private let CS_PLATFORM: UInt32  = 0x00000400
 private let CS_INSTALLER: UInt32 = 0x00080000
 
+
+// MARK: - 私有 Security 符号
+//
+// SecTask 系列在公开 SDK 里没有头文件，但 dyld 符号存在，直接声明即可链接。
+
+@_silgen_name("SecTaskCreateFromSelf")
+private func ph_SecTaskCreateFromSelf(_ allocator: CFAllocator?) -> CFTypeRef?
+
+@_silgen_name("SecTaskCopyValueForEntitlement")
+private func ph_SecTaskCopyValueForEntitlement(_ task: CFTypeRef,
+                                               _ entitlement: CFString,
+                                               _ error: UnsafeMutablePointer<Unmanaged<CFError>?>?) -> CFTypeRef?
+
 enum LevelA {
 
     static let all: [Detector] = [
@@ -507,13 +520,13 @@ enum LevelA {
         name: "Entitlements 校验",
         detail: "用 SecTask 读取本进程的 entitlements，校验 application-identifier 是否为 TeamID.BundleID 格式、get-task-allow 状态、以及是否存在异常的自定义权限。重签名常在这里留下痕迹。",
         run: {
-            guard let task = SecTaskCreateFromSelf(nil) else { return nil }
+            guard let task = ph_SecTaskCreateFromSelf(nil) else { return nil }
 
             var issues: [String] = []
 
             // application-identifier 必须是 TeamID.BundleID
             let appIdKey = "application-identifier" as CFString
-            if let val = SecTaskCopyValueForEntitlement(task, appIdKey, nil) as? String {
+            if let val = ph_SecTaskCopyValueForEntitlement(task, appIdKey, nil) as? String {
                 let comps = val.split(separator: ".")
                 let bid = Bundle.main.bundleIdentifier ?? ""
                 if comps.count < 2 {
@@ -531,13 +544,13 @@ enum LevelA {
 
             // get-task-allow
             let gtaKey = "get-task-allow" as CFString
-            if let gta = SecTaskCopyValueForEntitlement(task, gtaKey, nil) as? Bool, gta {
+            if let gta = ph_SecTaskCopyValueForEntitlement(task, gtaKey, nil) as? Bool, gta {
                 issues.append("get-task-allow=true（允许调试器附加）")
             }
 
             // 是否有平台签名标记（正常 App 不该有）
             let platKey = "platform-application" as CFString
-            if let plat = SecTaskCopyValueForEntitlement(task, platKey, nil) as? Bool, plat {
+            if let plat = ph_SecTaskCopyValueForEntitlement(task, platKey, nil) as? Bool, plat {
                 issues.append("带 platform-application 权限（平台级伪造）")
             }
 

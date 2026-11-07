@@ -19,12 +19,12 @@ extension ScanReport {
 
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        out.append("时间    : \(f.string(from: date))")
+        out.append("时间    : \(f.string(from: startedAt))")
         out.append("设备    : \(Self.deviceModel())")
         out.append("系统    : iOS \(UIDevice.current.systemVersion)")
         out.append("等级    : \(level.badge) \(level.title) · \(results.count) 项")
         out.append("风险    : \(riskScore)/100 \(riskTier.label)")
-        out.append("结果    : \(passedCount) 通过 / \(failedCount) 未通过")
+        out.append("结果    : \(passedCount) 通过 / \(triggeredCount) 未通过")
         out.append("耗时    : \(String(format: "%.2f", duration))s")
         out.append("")
 
@@ -63,13 +63,13 @@ extension ScanReport {
         f.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZZZZZ"
         dict["app"] = "Aegis"
         dict["version"] = "1.4.0"
-        dict["time"] = f.string(from: date)
+        dict["time"] = f.string(from: startedAt)
         dict["device"] = Self.deviceModel()
         dict["system"] = "iOS \(UIDevice.current.systemVersion)"
         dict["level"] = level.id
         dict["total"] = results.count
         dict["passed"] = passedCount
-        dict["failed"] = failedCount
+        dict["failed"] = triggeredCount
         dict["riskScore"] = riskScore
         dict["riskTier"] = riskTier.label
         dict["duration"] = Double(String(format: "%.2f", duration)) ?? 0
@@ -102,7 +102,7 @@ extension ScanReport {
         var out: [String] = []
         out.append("Aegis · \(level.badge) \(level.title) · \(riskScore)/100 \(riskTier.label)")
         out.append("\(Self.deviceModel()) / iOS \(UIDevice.current.systemVersion)")
-        out.append("通过 \(passedCount) / 未通过 \(failedCount)")
+        out.append("通过 \(passedCount) / 未通过 \(triggeredCount)")
         if !failed.isEmpty {
             out.append("")
             for r in failed {
