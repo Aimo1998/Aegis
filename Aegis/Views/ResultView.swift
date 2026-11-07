@@ -16,6 +16,7 @@ struct ResultView: View {
         ScrollView {
             VStack(spacing: 24) {
                 verdictHeader
+                riskCard
                 statBar
 
                 VStack(spacing: 10) {
@@ -54,6 +55,69 @@ struct ResultView: View {
                 .foregroundStyle(.white.opacity(0.42))
         }
         .padding(.bottom, 2)
+    }
+
+    // MARK: 风险评分
+
+    private var riskCard: some View {
+        VStack(spacing: 9) {
+            HStack(alignment: .firstTextBaseline, spacing: 7) {
+                Text("风险评分")
+                    .font(.system(size: 12.5, weight: .medium, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.42))
+
+                Spacer()
+
+                Text("\(report.riskScore)")
+                    .font(.system(size: 27, weight: .bold, design: .rounded))
+                    .foregroundStyle(report.riskTier.color)
+
+                Text("/ 100")
+                    .font(.system(size: 11, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.25))
+
+                Text(report.riskTier.label)
+                    .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                    .foregroundStyle(report.riskTier.color)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 2)
+                    .background(Capsule().fill(report.riskTier.color.opacity(0.15)))
+            }
+
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(Color.white.opacity(0.07))
+                    Capsule()
+                        .fill(
+                            LinearGradient(
+                                colors: [report.riskTier.color.opacity(0.65),
+                                         report.riskTier.color],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: geo.size.width * CGFloat(report.riskScore) / 100.0)
+                }
+            }
+            .frame(height: 6)
+
+            HStack {
+                Text("命中权重 \(report.hitWeight) / \(report.totalWeight)")
+                    .font(.system(size: 10.5, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.28))
+                Spacer()
+            }
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.white.opacity(0.045))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(report.riskTier.color.opacity(0.25), lineWidth: 1)
+                )
+        )
     }
 
     // MARK: 统计条
@@ -213,6 +277,18 @@ struct CheckRow: View {
                         .font(.system(size: 12, weight: .regular, design: .rounded))
                         .foregroundStyle(.white.opacity(0.52))
                         .fixedSize(horizontal: false, vertical: true)
+
+                    if !result.bypass.isEmpty {
+                        HStack(alignment: .top, spacing: 6) {
+                            Text("绕过")
+                                .font(.system(size: 10.5, weight: .bold, design: .rounded))
+                                .foregroundStyle(.white.opacity(0.35))
+                            Text(result.bypass)
+                                .font(.system(size: 11.5, design: .rounded))
+                                .foregroundStyle(Color(red: 0.55, green: 0.75, blue: 1.0).opacity(0.85))
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
 
                     if let ev = result.evidence {
                         HStack(alignment: .top, spacing: 6) {

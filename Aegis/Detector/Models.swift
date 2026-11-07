@@ -82,6 +82,12 @@ struct CheckResult: Identifiable {
     let evidence: String?
 
     var passed: Bool { !triggered }
+
+    /// 该项权重
+    var weight: Int { DetectorCatalog.weight(for: id) }
+
+    /// 该类检测的绕过思路
+    var bypass: String { DetectorCatalog.bypass(for: id) }
 }
 
 /// 一次完整扫描的聚合结果
@@ -108,5 +114,43 @@ struct ScanReport {
     var tint: Color {
         isJailbroken ? Color(red: 0.92, green: 0.32, blue: 0.32)
                      : Color(red: 0.20, green: 0.78, blue: 0.45)
+    }
+
+    // MARK: 风险评分
+
+    /// 命中项权重占全部权重的百分比（0–100）
+    var riskScore: Int {
+        let total = DetectorCatalog.totalWeight
+        guard total > 0 else { return 0 }
+        let hit = results.filter(\.triggered).reduce(0) { $0 + $1.weight }
+        let pct = Double(hit) / Double(total) * 100.0
+        return min(100, Int(pct.rounded()))
+    }
+
+    /// 命中权重绝对值
+    var hitWeight: Int {
+        results.filter(\.triggered).reduce(0) { $0 + $1.weight }
+    }
+
+    var totalWeight: Int { DetectorCatalog.totalWeight }
+
+    struct RiskTier {
+        let label: String
+        let color: Color
+    }
+
+    var riskTier: RiskTier {
+        switch riskScore {
+        case 0:
+            return RiskTier(label: "安全", color: Color(red: 0.20, green: 0.78, blue: 0.45))
+        case 1...25:
+            return RiskTier(label: "低风险", color: Color(red: 0.55, green: 0.78, blue: 0.50))
+        case 26...50:
+            return RiskTier(label: "中风险", color: Color(red: 0.95, green: 0.75, blue: 0.30))
+        case 51...75:
+            return RiskTier(label: "高风险", color: Color(red: 0.98, green: 0.55, blue: 0.30))
+        default:
+            return RiskTier(label: "极高风险", color: Color(red: 0.95, green: 0.30, blue: 0.30))
+        }
     }
 }

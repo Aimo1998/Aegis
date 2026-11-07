@@ -139,3 +139,65 @@ enum DetectorCatalog {
         "A6": "App Attest 完整性"
     ]
 }
+
+// MARK: - 检测项元数据：权重与绕过思路
+
+struct DetectorMeta {
+    let weight: Int
+    let bypass: String
+}
+
+extension DetectorCatalog {
+
+    static let meta: [String: DetectorMeta] = [
+        "C1": DetectorMeta(weight: 8,
+            bypass: "RootHide 通过进程级路径重定向让 App 看不到真实文件树"),
+        "C2": DetectorMeta(weight: 6,
+            bypass: "卸载越狱工具 App，对应 scheme 随之消失"),
+        "C3": DetectorMeta(weight: 15,
+            bypass: "沙盒由内核强制，绕过需修改 sandbox profile，成本极高"),
+        "C4": DetectorMeta(weight: 10,
+            bypass: "启动时清空 DYLD_* 环境变量，或用 launchd 干净拉起"),
+        "C5": DetectorMeta(weight: 5,
+            bypass: "模拟器无法伪装 Secure Enclave，此项对真机天然通过"),
+
+        "B1": DetectorMeta(weight: 12,
+            bypass: "RootHide 使用动态随机挂载点，并 Hook stat 系列使其不可见"),
+        "B2": DetectorMeta(weight: 15,
+            bypass: "无痕注入（dylib 不落盘）+ 库名混淆，但会牺牲部分功能"),
+        "B3": DetectorMeta(weight: 18,
+            bypass: "需同时伪造 IMP 归属，让 dladdr 返回合法系统库，成本极高"),
+        "B4": DetectorMeta(weight: 12,
+            bypass: "隐藏 Frida 端口与线程名；ptrace 层需内核态配合"),
+        "B5": DetectorMeta(weight: 15,
+            bypass: "注入后清理 RWX 页权限，改用 RX + 写时复制"),
+        "B6": DetectorMeta(weight: 10,
+            bypass: "守护进程改名并隔离到独立命名空间"),
+
+        "A1": DetectorMeta(weight: 25,
+            bypass: "必须同时 Hook libc 与裸 syscall 且结果完全一致，极易露馅"),
+        "A2": DetectorMeta(weight: 20,
+            bypass: "csflags 由内核维护，用户态无法伪造；TrustCache 需内核补丁"),
+        "A3": DetectorMeta(weight: 15,
+            bypass: "bootargs 只读；挂载表可用 mount namespace 隔离"),
+        "A4": DetectorMeta(weight: 22,
+            bypass: "拦截层需把耗时控制在微秒级且与真实 VFS 一致，几乎不可能"),
+        "A5": DetectorMeta(weight: 25,
+            bypass: "需完整伪造指针链与映像归属，攻击成本极高"),
+        "A6": DetectorMeta(weight: 10,
+            bypass: "需付费开发者证书 + 服务端 App Attest 校验")
+    ]
+
+    static func weight(for id: String) -> Int {
+        meta[id]?.weight ?? 5
+    }
+
+    static func bypass(for id: String) -> String {
+        meta[id]?.bypass ?? ""
+    }
+
+    /// 全部检测项权重之和
+    static var totalWeight: Int {
+        meta.values.reduce(0) { $0 + $1.weight }
+    }
+}
