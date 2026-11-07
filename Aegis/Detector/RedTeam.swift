@@ -42,6 +42,8 @@ enum RedTeam {
 
         // 立刻恢复（无论检测结果如何）
         method_setImplementation(method, originalIMP)
+        // imp_implementationWithBlock 创建的 block 必须手动释放，否则每次自测都会泄漏
+        imp_removeBlock(fakeIMP)
 
         let duration = Date().timeIntervalSince(start)
 
@@ -59,7 +61,7 @@ enum RedTeam {
     /// 检查 B2 在当前进程里能枚举出多少个 dylib
     static func dylibVisibilityTest() -> TestResult {
         let start = Date()
-        let total = Int(aegis_dyld_image_count())
+        let total = max(0, Int(aegis_dyld_image_count()))
         let images = DylibScanner.scan()
         let injected = images.filter { $0.category == .jailbreakInjected }
         let duration = Date().timeIntervalSince(start)

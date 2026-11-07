@@ -97,7 +97,9 @@ enum LevelB {
         name: "注入框架扫描",
         detail: "遍历 _dyld_image_count 枚举所有已加载的 dylib，匹配 ElleKit / MobileSubstrate / Substitute / libhooker / systemhook / TweakLoader / Frida 等 16 个特征。",
         run: {
-            let count = Int(aegis_dyld_image_count())
+            let rawCount = aegis_dyld_image_count()
+            guard rawCount > 0 else { return nil }
+            let count = Int(rawCount)
             var hits: [String] = []
 
             for i in 0..<count {

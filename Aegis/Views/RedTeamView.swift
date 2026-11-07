@@ -188,12 +188,14 @@ struct RedTeamView: View {
         tamperResult = nil
         dylibResult = nil
 
-        DispatchQueue.global(qos: .userInitiated).async {
-            let t = RedTeam.selfTamperTest()
-            DispatchQueue.main.async {
-                tamperResult = t
-            }
+        // 自我篡改要替换 UIView.layoutSubviews 的实现，必须在主线程执行，
+        // 否则可能与正在绘制的 UIKit 产生竞态
+        DispatchQueue.main.async {
+            tamperResult = RedTeam.selfTamperTest()
+        }
 
+        // 注入库枚举是纯 IO（每个映像 stat 一次），放后台避免卡界面
+        DispatchQueue.global(qos: .userInitiated).async {
             let d = RedTeam.dylibVisibilityTest()
             DispatchQueue.main.async {
                 dylibResult = d

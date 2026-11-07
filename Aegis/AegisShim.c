@@ -76,17 +76,24 @@ bool aegis_address_in_image(uintptr_t addr) {
         const struct mach_header_64 *h64 = (const struct mach_header_64 *)hdr;
         if (h64->magic != MH_MAGIC_64) continue;
 
-        // 粗粒度：用 __TEXT 段范围判断（maxprot 足够做归属检测）
+        // 遍历 load commands 时必须限制在 sizeofcmds 之内，
+        // 否则遇到畸形 Mach-O 会越界读导致崩溃
         const uint8_t *p = (const uint8_t *)(h64 + 1);
+        const uint8_t *limit = p + h64->sizeofcmds;
+
         for (uint32_t c = 0; c < h64->ncmds; c++) {
+            if (p + sizeof(struct load_command) > limit) break;
+
             const struct load_command *lc = (const struct load_command *)p;
-            if (lc->cmd == LC_SEGMENT_64) {
+            if (lc->cmdsize < sizeof(struct load_command)) break;   // 畸形 cmdsize
+
+            if (lc->cmd == LC_SEGMENT_64 && lc->cmdsize >= sizeof(struct segment_command_64)) {
                 const struct segment_command_64 *seg = (const struct segment_command_64 *)lc;
                 uintptr_t start = (uintptr_t)(seg->vmaddr + slide);
                 uintptr_t end = start + seg->vmsize;
                 if (addr >= start && addr < end) return true;
             }
-            if (lc->cmdsize == 0) break;
+
             p += lc->cmdsize;
         }
     }
@@ -123,6 +130,8 @@ int aegis_count_rwx_regions(void) {
             }
         }
 
+        // size 为 0 时 address 不会前进，会死循环
+        if (size == 0) break;
         address += size;
         if (address == 0) break;
     }

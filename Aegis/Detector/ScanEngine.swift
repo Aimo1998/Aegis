@@ -15,9 +15,15 @@ final class ScanEngine: ObservableObject {
     @Published var currentCheck: String = ""
     @Published var report: ScanReport?
 
+    /// 每次扫描递增，用于让被 reset 掉的扫描自行退出
+    private var token: Int = 0
+
     /// 开始扫描指定等级
     func scan(level: DetectionLevel, cascade: Bool = false) {
         guard !isScanning else { return }
+
+        token += 1
+        let myToken = token
 
         isScanning = true
         progress = 0
@@ -36,6 +42,9 @@ final class ScanEngine: ObservableObject {
             var results: [CheckResult] = []
 
             for (index, detector) in checks.enumerated() {
+                // 已被 reset，放弃后续检测
+                if self.token != myToken { return }
+
                 DispatchQueue.main.async {
                     self.currentCheck = detector.name
                 }
@@ -67,6 +76,7 @@ final class ScanEngine: ObservableObject {
             )
 
             DispatchQueue.main.async {
+                guard self.token == myToken else { return }
                 self.report = finalReport
                 self.isScanning = false
                 self.progress = 1
@@ -78,6 +88,7 @@ final class ScanEngine: ObservableObject {
     }
 
     func reset() {
+        token += 1          // 使进行中的扫描失效
         report = nil
         progress = 0
         currentCheck = ""

@@ -50,8 +50,9 @@ enum DylibScanner {
     ]
 
     static func scan() -> [LoadedImage] {
-        let count = Int(aegis_dyld_image_count())
-        guard count > 0 else { return [] }
+        let raw = aegis_dyld_image_count()
+        guard raw > 0 else { return [] }
+        let count = Int(raw)
 
         var list: [LoadedImage] = []
         let fm = FileManager.default
