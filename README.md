@@ -97,25 +97,6 @@ uicache -p /var/jb/Applications/Aegis.app
 
 ---
 
-## 构建
-
-### Codemagic（无需 Mac）
-
-仓库内已附 `codemagic.yaml`，在 [codemagic.io](https://codemagic.io) 关联本仓库后直接触发构建，产物同时输出 `Aegis.deb` 与 `Aegis.ipa`。
-
-### 本地 macOS
-
-```bash
-brew install xcodegen
-./build.sh
-```
-
-### GitHub Actions
-
-`.github/workflows/build-ipa.yml` 已就绪。注意 macOS runner 排队可能较久。
-
----
-
 ## 技术说明
 
 ### 为什么底层调用都走 C shim
