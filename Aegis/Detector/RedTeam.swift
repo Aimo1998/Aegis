@@ -27,7 +27,7 @@ enum RedTeam {
 
         let sel = NSSelectorFromString("layoutSubviews")
         guard let method = class_getInstanceMethod(UIView.self, sel) else {
-            return TestResult(detected: false, detail: "未找到 UIView.layoutSubviews", duration: 0)
+            return TestResult(detected: false, detail: L10n.shared.t("未找到 UIView.layoutSubviews", "UIView.layoutSubviews not found"), duration: 0)
         }
 
         let originalIMP = method_getImplementation(method)
@@ -49,11 +49,12 @@ enum RedTeam {
 
         if let e = evidence {
             return TestResult(detected: true,
-                              detail: "B3 成功捕获自我篡改：" + e,
+                              detail: L10n.shared.t("B3 成功捕获自我篡改：", "B3 caught the self-tamper: ") + e,
                               duration: duration)
         }
         return TestResult(detected: false,
-                          detail: "B3 未捕获（IMP 替换后 dladdr 仍返回合法映像，检测存在盲点）",
+                          detail: L10n.shared.t("B3 未捕获（IMP 替换后 dladdr 仍返回合法映像，检测存在盲点）",
+                     "B3 missed it — dladdr still resolves to a legit image after the IMP swap"),
                           duration: duration)
     }
 
@@ -66,7 +67,7 @@ enum RedTeam {
         let injected = images.filter { $0.category == .jailbreakInjected }
         let duration = Date().timeIntervalSince(start)
 
-        let detail = "共枚举 \(total) 个映像，其中越狱路径注入 \(injected.count) 个"
+        let detail = L10n.shared.t("共枚举 ", "Enumerated ") + "\(total) " + L10n.shared.t("个映像，其中越狱路径注入 ", "images, ") + "\(injected.count) " + L10n.shared.t("个", "injected")
         return TestResult(detected: !injected.isEmpty, detail: detail, duration: duration)
     }
 }

@@ -60,7 +60,7 @@ struct ResultView: View {
                 .foregroundStyle(report.isJailbroken ? report.tint : .white)
                 .multilineTextAlignment(.center)
 
-            Text(report.level.title + " · 共 \(report.results.count) 项")
+            Text(report.level.title + " · " + l10n.t("共 ", "of ") + "\(report.results.count) " + l10n.t("项", "items"))
                 .font(.system(size: 13, weight: .medium, design: .rounded))
                 .foregroundStyle(.white.opacity(0.42))
         }
@@ -139,7 +139,7 @@ struct ResultView: View {
             divider
             statCell(value: "\(report.triggeredCount)", label: l10n.t("未通过", "Failed"), color: report.tint)
             divider
-            statCell(value: String(format: "%.2fs", report.duration), label: "耗时", color: .white.opacity(0.75))
+            statCell(value: String(format: "%.2fs", report.duration), label: l10n.t("耗时", "Time"), color: .white.opacity(0.75))
         }
         .padding(.vertical, 15)
         .background(
@@ -378,7 +378,7 @@ struct CheckRow: View {
                     HStack(spacing: 5) {
                         Image(systemName: rerunning ? "arrow.triangle.2.circlepath" : "arrow.clockwise")
                             .font(.system(size: 11, weight: .semibold))
-                        Text(rerunning ? "重测中…" : "重测此项")
+                        Text(rerunning ? l10n.t("重测中…", "Testing…") : l10n.t("重测此项", "Re-test"))
                             .font(.system(size: 11.5, weight: .medium, design: .rounded))
                     }
                     .foregroundStyle(Color(red: 0.55, green: 0.78, blue: 1.0))

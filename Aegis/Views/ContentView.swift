@@ -276,7 +276,7 @@ struct ContentView: View {
                     .foregroundStyle(.white.opacity(0.55))
                     .frame(width: 26)
 
-                Text("跳转至作者Github")
+                Text(L10n.shared.t("跳转至作者Github", "Author on GitHub"))
                     .font(.system(size: 15, weight: .semibold, design: .rounded))
                     .foregroundStyle(.white)
 

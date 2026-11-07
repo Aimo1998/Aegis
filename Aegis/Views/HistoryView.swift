@@ -121,19 +121,20 @@ struct HistoryView: View {
                         if prev.total == entry.total {
                             comparisonBlock(diff: diff, previous: prev)
                         } else {
-                            Text("扫描范围不同（上次 \(prev.total) 项，本次 \(entry.total) 项），无法直接对比")
+                            Text(l10n.t("扫描范围不同（上次 \(prev.total) 项，本次 \(entry.total) 项），无法直接对比",
+                                        "Different scope (\(prev.total) vs \(entry.total) items), cannot compare"))
                                 .font(.system(size: 11.5, design: .rounded))
                                 .foregroundStyle(Color(red: 1.0, green: 0.75, blue: 0.45).opacity(0.8))
                         }
                     } else {
-                        Text("这是该等级的第一条记录，暂无对比基准")
+                        Text(l10n.t("这是该等级的第一条记录，暂无对比基准", "First record for this level, nothing to compare"))
                             .font(.system(size: 11.5, design: .rounded))
                             .foregroundStyle(.white.opacity(0.35))
                     }
 
                     if !entry.failedIDs.isEmpty {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("本次未通过 \(entry.failedIDs.count) 项")
+                            Text(l10n.t("本次未通过 ", "Failed ") + "\(entry.failedIDs.count) " + l10n.t("项", "items"))
                                 .font(.system(size: 11, weight: .semibold, design: .rounded))
                                 .foregroundStyle(.white.opacity(0.4))
                             ForEach(entry.failedIDs, id: \.self) { id in
@@ -161,22 +162,22 @@ struct HistoryView: View {
 
     private func comparisonBlock(diff: HistoryStore.Diff, previous: HistoryEntry) -> some View {
         VStack(alignment: .leading, spacing: 5) {
-            Text("对比上次（\(timeText(previous.date))）")
+            Text(l10n.t("对比上次（", "vs previous (") + "\(timeText(previous.date))）")
                 .font(.system(size: 11, weight: .semibold, design: .rounded))
                 .foregroundStyle(.white.opacity(0.4))
 
             if diff.newlyFailed.isEmpty && diff.recovered.isEmpty {
-                Text("✅ 与上次完全一致")
+                Text(l10n.t("✅ 与上次完全一致", "✅ Identical to last run"))
                     .font(.system(size: 11.5, design: .rounded))
                     .foregroundStyle(.green.opacity(0.8))
             } else {
                 ForEach(diff.newlyFailed, id: \.self) { id in
-                    Text("🔴 新增失败：\(DetectorCatalog.name(for: id)) (\(id))")
+                    Text("🔴 " + l10n.t("新增失败：", "newly failed: ") + "\(DetectorCatalog.name(for: id)) (\(id))")
                         .font(.system(size: 11.5, design: .monospaced))
                         .foregroundStyle(Color(red: 1.0, green: 0.55, blue: 0.50))
                 }
                 ForEach(diff.recovered, id: \.self) { id in
-                    Text("🟢 已恢复：\(DetectorCatalog.name(for: id)) (\(id))")
+                    Text("🟢 " + l10n.t("已恢复：", "recovered: ") + "\(DetectorCatalog.name(for: id)) (\(id))")
                         .font(.system(size: 11.5, design: .monospaced))
                         .foregroundStyle(.green.opacity(0.85))
                 }

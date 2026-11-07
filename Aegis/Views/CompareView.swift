@@ -206,6 +206,7 @@ struct CompareView: View {
             if p.device.isEmpty, line.contains("iOS") {
                 p.device = line.replacingOccurrences(of: "设备    : ", with: "")
                                 .replacingOccurrences(of: "Device  : ", with: "")
+                                .replacingOccurrences(of: "Device  : ", with: "")
                 if p.device.count > 22 { p.device = String(p.device.prefix(22)) }
             }
 

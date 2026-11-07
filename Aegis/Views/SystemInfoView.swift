@@ -31,6 +31,10 @@ struct InfoSection: Identifiable {
 
 enum SystemInfoCollector {
 
+    private static func T(_ zh: String, _ en: String) -> String {
+        L10n.shared.t(zh, en)
+    }
+
     private static func sysctlString(_ name: String) -> String? {
         var size = 0
         guard sysctlbyname(name, nil, &size, nil, 0) == 0, size > 0 else { return nil }
@@ -62,18 +66,18 @@ enum SystemInfoCollector {
             items.append(InfoItem(key: name, value: v, note: note))
         }
 
-        add("hw.machine", "hw.machine", "机型标识，模拟器为 arm64/x86_64")
-        add("hw.model", "hw.model", "iOS 返回平台代号（如 D22AP）")
+        add("hw.machine", "hw.machine", T("机型标识，模拟器为 arm64/x86_64", "Machine ID; simulators report arm64/x86_64"))
+        add("hw.model", "hw.model", T("iOS 返回平台代号（如 D22AP）", "iOS returns a platform code, e.g. D22AP"))
         add("hw.product", "hw.product", nil)
         add("hw.target", "hw.target", nil)
         add("hw.ncpu", "hw.ncpu", nil)
         add("hw.memsize", "hw.memsize", nil)
-        add("kern.osversion", "kern.osversion", "系统构建号")
-        add("kern.osproductversion", "kern.osproductversion", "系统版本号")
+        add("kern.osversion", "kern.osversion", T("系统构建号", "OS build"))
+        add("kern.osproductversion", "kern.osproductversion", T("系统版本号", "OS version"))
         add("kern.hostname", "kern.hostname", nil)
 
         if let mem = sysctlInt("hw.memsize") {
-            items.append(InfoItem(key: "内存",
+            items.append(InfoItem(key: T("内存", "Memory"),
                                   value: ByteCountFormatter.string(fromByteCount: mem, countStyle: .memory),
                                   note: nil))
         }
@@ -92,38 +96,38 @@ enum SystemInfoCollector {
         }
 
         if ret == 0 {
-            items.append(InfoItem(key: "csops 返回", value: "0", note: "成功"))
+            items.append(InfoItem(key: T("csops 返回", "csops return"), value: "0", note: T("成功", "ok")))
             items.append(InfoItem(key: "csflags",
                                   value: "0x" + String(flags, radix: 16).uppercased(),
                                   note: nil))
 
             let bits: [(String, UInt32, String)] = [
-                ("CS_VALID",      0x00000001, "签名有效"),
-                ("CS_HARD",       0x00000100, "页面不可动态改写"),
-                ("CS_KILL",       0x00000200, "违规会被内核终止"),
-                ("CS_PLATFORM",   0x00000400, "系统平台签名"),
-                ("CS_RESTRICT",   0x00000800, "受限签名"),
-                ("CS_DEBUGGED",   0x10000000, "允许调试（开发证书）"),
-                ("CS_INSTALLER",  0x00080000, "安装器签名"),
-                ("CS_REQUIRE_LV", 0x00002000, "要求库验证")
+                ("CS_VALID",      0x00000001, T("签名有效", "Signature valid")),
+                ("CS_HARD",       0x00000100, T("页面不可动态改写", "Pages immutable at runtime")),
+                ("CS_KILL",       0x00000200, T("违规会被内核终止", "Kernel kills on violation")),
+                ("CS_PLATFORM",   0x00000400, T("系统平台签名", "Platform signed")),
+                ("CS_RESTRICT",   0x00000800, T("受限签名", "Restricted signing")),
+                ("CS_DEBUGGED",   0x10000000, T("允许调试（开发证书）", "Debuggable (dev cert)")),
+                ("CS_INSTALLER",  0x00080000, T("安装器签名", "Installer signed")),
+                ("CS_REQUIRE_LV", 0x00002000, T("要求库验证", "Library validation required"))
             ]
 
             for (name, bit, desc) in bits {
                 let on = (flags & bit) != 0
                 items.append(InfoItem(key: name,
-                                      value: on ? "✅ 已置位" : "⬜️ 未置位",
+                                      value: on ? T("✅ 已置位", "✅ set") : T("⬜️ 未置位", "⬜️ not set"),
                                       note: desc))
             }
         } else {
-            items.append(InfoItem(key: "csops 返回", value: "\(ret)",
-                                  note: "失败 errno=\(errno)"))
+            items.append(InfoItem(key: T("csops 返回", "csops return"), value: "\(ret)",
+                                  note: T("失败 errno=", "failed errno=") + "\(errno)"))
         }
 
         items.append(InfoItem(key: "ptrace(PT_DENY_ATTACH)",
                               value: "\(aegis_ptrace_deny_attach())",
-                              note: "0 = 成功；被 Hook 时行为可能异常"))
+                              note: T("0 = 成功；被 Hook 时行为可能异常", "0 = ok; may misbehave when hooked")))
         items.append(InfoItem(key: "getppid()", value: "\(getppid())",
-                              note: "正常 App 应为 1（launchd）"))
+                              note: T("正常 App 应为 1（launchd）", "should be 1 (launchd) for a normal app")))
 
         return InfoSection(title: L10n.shared.t("代码签名", "Code Signing"), icon: "checkmark.seal", items: items)
     }
@@ -134,11 +138,11 @@ enum SystemInfoCollector {
         var items: [InfoItem] = []
 
         let total = Int(aegis_dyld_image_count())
-        items.append(InfoItem(key: "已加载映像", value: "\(total)", note: "dyld_image_count"))
+        items.append(InfoItem(key: T("已加载映像", "Loaded images"), value: "\(total)", note: "dyld_image_count"))
 
         let images = DylibScanner.scan()
         let injected = images.filter { $0.category == .jailbreakInjected }
-        items.append(InfoItem(key: "越狱路径映像", value: "\(injected.count)",
+        items.append(InfoItem(key: T("越狱路径映像", "Jailbreak images"), value: "\(injected.count)",
                               note: injected.isEmpty ? nil : injected.prefix(3).map(\.name).joined(separator: ", ")))
 
         // 生物识别
@@ -152,14 +156,14 @@ enum SystemInfoCollector {
         @unknown default: bio = "unknown"
         }
         items.append(InfoItem(key: "biometryType", value: bio,
-                              note: "反映硬件存在性，与是否录入无关"))
+                              note: T("反映硬件存在性，与是否录入无关", "hardware presence, independent of enrollment")))
 
-        items.append(InfoItem(key: "App Attest 支持",
-                              value: DCAppAttestService.shared.isSupported ? "✅ 支持" : "⬜️ 不支持",
-                              note: "需要付费账号 entitlement"))
+        items.append(InfoItem(key: T("App Attest 支持", "App Attest"),
+                              value: DCAppAttestService.shared.isSupported ? T("✅ 支持", "✅ supported") : T("⬜️ 不支持", "⬜️ unsupported"),
+                              note: T("需要付费账号 entitlement", "needs a paid account entitlement")))
 
-        items.append(InfoItem(key: "RWX 内存页", value: "\(aegis_count_rwx_regions())",
-                              note: "非映像归属的 W+X 页"))
+        items.append(InfoItem(key: T("RWX 内存页", "RWX pages"), value: "\(aegis_count_rwx_regions())",
+                              note: T("非映像归属的 W+X 页", "W+X pages not owned by any image")))
 
         // x86 环境变量
         let envKeys = ["DYLD_INSERT_LIBRARIES", "DYLD_LIBRARY_PATH",
@@ -169,8 +173,8 @@ enum SystemInfoCollector {
             let s = String(cString: v)
             return s.isEmpty ? nil : "\(k)=\(s)"
         }
-        items.append(InfoItem(key: "DYLD_* 变量",
-                              value: set.isEmpty ? "未设置" : "\(set.count) 个",
+        items.append(InfoItem(key: T("DYLD_* 变量", "DYLD_* vars"),
+                              value: set.isEmpty ? T("未设置", "not set") : "\(set.count)"),
                               note: set.first))
 
         return InfoSection(title: L10n.shared.t("运行时", "Runtime"), icon: "cpu", items: items)
@@ -198,13 +202,13 @@ enum SystemInfoCollector {
             let note: String
             if rLibc == 0 && rRaw == 0 {
                 let isDir = (stLibc.st_mode & S_IFMT) == S_IFDIR
-                note = "存在（\(isDir ? "目录" : "文件")），两条路径一致=\(same ? "是" : "否 ⚠️")"
+                note = T("存在", "exists") + "（" + (isDir ? T("目录", "dir") : T("文件", "file")) + "），" + T("两条路径一致=", "consistent=") + (same ? T("是", "yes") : T("否 ⚠️", "no ⚠️"))
             } else if rLibc == 0 {
-                note = "仅 libc 可见 ⚠️"
+                note = T("仅 libc 可见 ⚠️", "only visible via libc ⚠️")
             } else if rRaw == 0 {
-                note = "仅裸 syscall 可见 ⚠️"
+                note = T("仅裸 syscall 可见 ⚠️", "only visible via raw syscall ⚠️")
             } else {
-                note = "均不存在（errno \(errno)）"
+                note = T("均不存在", "neither exists") + "（errno \(errno)）"
             }
 
             items.append(InfoItem(key: path, value: value, note: note))
@@ -216,8 +220,8 @@ enum SystemInfoCollector {
             let l = $0.lowercased()
             return l.contains("jbroot") || l.contains("/var/jb") || l.contains("procursus")
         }
-        items.append(InfoItem(key: "挂载点总数", value: "\(mounts.count)", note: nil))
-        items.append(InfoItem(key: "可疑挂载点", value: "\(jbMounts.count)",
+        items.append(InfoItem(key: T("挂载点总数", "Mount count"), value: "\(mounts.count)", note: nil))
+        items.append(InfoItem(key: T("可疑挂载点", "Suspicious mounts"), value: "\(jbMounts.count)",
                               note: jbMounts.first))
 
         // bootargs
@@ -226,10 +230,10 @@ enum SystemInfoCollector {
         let ok = buf.withUnsafeMutableBufferPointer { p -> Bool in
             aegis_read_bootargs(p.baseAddress, size_t(2048), &outLen)
         }
-        let bootargs = ok ? String(cString: buf) : "读取失败"
+        let bootargs = ok ? String(cString: buf) : T("读取失败", "read failed")
         items.append(InfoItem(key: "kern.bootargs",
-                              value: bootargs.isEmpty ? "（空）" : String(bootargs.prefix(120)),
-                              note: ok ? nil : "sysctl 被拒绝"))
+                              value: bootargs.isEmpty ? T("（空）", "(empty)") : String(bootargs.prefix(120)),
+                              note: ok ? nil : T("sysctl 被拒绝", "sysctl denied")))
 
         return InfoSection(title: L10n.shared.t("文件系统探测", "Filesystem"), icon: "folder", items: items)
     }
@@ -240,8 +244,8 @@ enum SystemInfoCollector {
         var items: [InfoItem] = []
 
         let procs = aegisFetchProcesses() ?? []
-        items.append(InfoItem(key: "进程表条目", value: "\(procs.count)",
-                              note: procs.isEmpty ? "可能受沙盒限制" : nil))
+        items.append(InfoItem(key: T("进程表条目", "Process entries"), value: "\(procs.count)",
+                              note: procs.isEmpty ? T("可能受沙盒限制", "may be sandbox-limited") : nil))
 
         let suspicious = ["jailbreakd", "linjector", "frida-server", "dropbear",
                           "sshd", "dopamine", "trollstorehelper", "ellekit"]
@@ -249,7 +253,7 @@ enum SystemInfoCollector {
             let l = p.lowercased()
             return suspicious.contains { l.contains($0) }
         }
-        items.append(InfoItem(key: "可疑进程", value: "\(hits.count)",
+        items.append(InfoItem(key: T("可疑进程", "Suspicious procs"), value: "\(hits.count)",
                               note: hits.isEmpty ? nil : hits.prefix(5).joined(separator: ", ")))
 
         items.append(InfoItem(key: "pid", value: "\(getpid())", note: nil))
@@ -259,7 +263,7 @@ enum SystemInfoCollector {
             items.append(InfoItem(key: "Bundle ID", value: bundle, note: nil))
         }
         if let exe = Bundle.main.executablePath {
-            items.append(InfoItem(key: "可执行路径", value: exe, note: nil))
+            items.append(InfoItem(key: T("可执行路径", "Executable"), value: exe, note: nil))
         }
 
         return InfoSection(title: L10n.shared.t("进程与环境", "Process & Env"), icon: "list.bullet", items: items)

@@ -14,41 +14,41 @@ extension ScanReport {
     func exportText() -> String {
         var out: [String] = []
 
-        out.append("Aegis 检测报告")
+        out.append(L10n.shared.t("Aegis 检测报告", "Aegis Report"))
         out.append(String(repeating: "=", count: 40))
 
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        out.append("时间    : \(f.string(from: startedAt))")
-        out.append("设备    : \(Self.deviceModel())")
-        out.append("系统    : iOS \(UIDevice.current.systemVersion)")
-        out.append("等级    : \(level.badge) \(level.title) · \(results.count) 项")
-        out.append("风险    : \(riskScore)/100 \(riskTier.label)")
-        out.append("结果    : \(passedCount) 通过 / \(triggeredCount) 未通过")
-        out.append("耗时    : \(String(format: "%.2f", duration))s")
+        out.append(L10n.shared.t("时间    : ", "Time    : ") + f.string(from: startedAt))
+        out.append(L10n.shared.t("设备    : ", "Device  : ") + Self.deviceModel())
+        out.append(L10n.shared.t("系统    : iOS ", "System  : iOS ") + UIDevice.current.systemVersion)
+        out.append(L10n.shared.t("等级    : ", "Level   : ") + "\(level.badge) \(level.title) · \(results.count) " + L10n.shared.t("项", "items"))
+        out.append(L10n.shared.t("风险    : ", "Risk    : ") + "\(riskScore)/100 \(riskTier.label)")
+        out.append(L10n.shared.t("结果    : ", "Result  : ") + "\(passedCount) " + L10n.shared.t("通过", "passed") + " / \(triggeredCount) " + L10n.shared.t("未通过", "failed"))
+        out.append(L10n.shared.t("耗时    : ", "Elapsed : ") + String(format: "%.2f", duration) + "s")
         out.append("")
 
         let failed = results.filter { $0.triggered }
         if failed.isEmpty {
-            out.append("未发现异常")
+            out.append(L10n.shared.t("未发现异常", "No anomalies found"))
         } else {
-            out.append("── 未通过项 ──")
+            out.append(L10n.shared.t("── 未通过项 ──", "── Failed ──"))
             for r in failed {
                 out.append("")
-                out.append("[\(r.id)] \(r.name)  (权重 \(r.weight))")
-                out.append("  证据: \(r.evidence ?? "—")")
-                out.append("  原理: \(r.detail)")
+                out.append("[\(r.id)] \(r.localizedName)  (" + L10n.shared.t("权重", "weight") + " \(r.weight))")
+                out.append("  " + L10n.shared.t("证据", "Evidence") + ": \(r.evidence ?? "—")")
+                out.append("  " + L10n.shared.t("原理", "Why") + ": \(r.localizedDetail)")
                 if !r.bypass.isEmpty {
-                    out.append("  绕过: \(r.bypass)")
+                    out.append("  " + L10n.shared.t("绕过", "Bypass") + ": \(r.localizedBypass)")
                 }
             }
         }
 
         out.append("")
-        out.append("── 全部结果 ──")
+        out.append(L10n.shared.t("── 全部结果 ──", "── All items ──"))
         for r in results {
             let mark = r.passed ? "✅" : "❌"
-            out.append("\(mark) \(r.id) \(r.name)")
+            out.append("\(mark) \(r.id) \(r.localizedName)")
         }
 
         out.append("")
@@ -78,7 +78,7 @@ extension ScanReport {
         for r in results {
             items.append([
                 "id": r.id,
-                "name": r.name,
+                "name": r.localizedName,
                 "passed": r.passed,
                 "weight": r.weight,
                 "evidence": r.evidence ?? "",
@@ -102,11 +102,11 @@ extension ScanReport {
         var out: [String] = []
         out.append("Aegis · \(level.badge) \(level.title) · \(riskScore)/100 \(riskTier.label)")
         out.append("\(Self.deviceModel()) / iOS \(UIDevice.current.systemVersion)")
-        out.append("通过 \(passedCount) / 未通过 \(triggeredCount)")
+        out.append(L10n.shared.t("通过 ", "passed ") + "\(passedCount) / " + L10n.shared.t("未通过 ", "failed ") + "\(triggeredCount)")
         if !failed.isEmpty {
             out.append("")
             for r in failed {
-                out.append("❌ \(r.id) \(r.name)")
+                out.append("❌ \(r.id) \(r.localizedName)")
                 if let e = r.evidence { out.append("   \(e)") }
             }
         }

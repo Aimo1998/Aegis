@@ -25,14 +25,16 @@ struct RedTeamView: View {
                 testCard(
                     icon: "🩹",
                     title: l10n.t("自我篡改测试", "Self-tamper test"),
-                    subtitle: "临时把 UIView.layoutSubviews 的 IMP 换成动态 block，跑 B3 看能否捕获，测完立即还原",
+                    subtitle: l10n.t("临时把 UIView.layoutSubviews 的 IMP 换成动态 block，跑 B3 看能否捕获，测完立即还原",
+                                 "Temporarily swaps UIView.layoutSubviews' IMP for a dynamic block, runs B3, then restores"),
                     result: tamperResult
                 )
 
                 testCard(
                     icon: "📚",
                     title: l10n.t("注入库可见性", "Image visibility"),
-                    subtitle: "统计当前进程能枚举出多少 dylib，以及其中来自越狱路径的有几个",
+                    subtitle: l10n.t("统计当前进程能枚举出多少 dylib，以及其中来自越狱路径的有几个",
+                                 "Counts how many dylibs this process can enumerate and how many are jailbreak paths"),
                     result: dylibResult
                 )
 
@@ -85,7 +87,7 @@ struct RedTeamView: View {
                     .foregroundStyle(.white)
                 Spacer()
                 if let r = result {
-                    Text(r.detected ? "已捕获" : "未捕获")
+                    Text(r.detected ? l10n.t("已捕获", "caught") : l10n.t("未捕获", "missed"))
                         .font(.system(size: 11, weight: .semibold, design: .rounded))
                         .foregroundStyle(r.detected ? .green : Color(red: 1.0, green: 0.6, blue: 0.4))
                         .padding(.horizontal, 8)
@@ -111,7 +113,7 @@ struct RedTeamView: View {
                                          : Color(red: 1.0, green: 0.65, blue: 0.45))
                         .fixedSize(horizontal: false, vertical: true)
 
-                    Text(String(format: "耗时 %.3fs", r.duration))
+                    Text(String(format: l10n.t("耗时 %.3fs", "took %.3fs"), r.duration))
                         .font(.system(size: 10.5, design: .rounded))
                         .foregroundStyle(.white.opacity(0.28))
                 }
