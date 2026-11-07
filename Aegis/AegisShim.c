@@ -8,6 +8,7 @@
 #include "AegisShim.h"
 
 #include <sys/syscall.h>
+#include <sys/ptrace.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/sysctl.h>
@@ -16,6 +17,7 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <string.h>
+#include <stdlib.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <mach/mach.h>
@@ -149,4 +151,55 @@ bool aegis_port_open(int port, int timeoutMs) {
     int r = connect(fd, (struct sockaddr *)&addr, sizeof(addr));
     close(fd);
     return r == 0;
+}
+
+#pragma mark - Swift 不可用符号的封装
+
+int aegis_dyld_image_count(void) {
+    return (int)_dyld_image_count();
+}
+
+const char *aegis_dyld_image_name(int index) {
+    return _dyld_get_image_name((uint32_t)index);
+}
+
+int aegis_ptrace_deny_attach(void) {
+#ifndef PT_DENY_ATTACH
+#define PT_DENY_ATTACH 31
+#endif
+    return (int)ptrace(PT_DENY_ATTACH, 0, 0, 0);
+}
+
+int aegis_fork_raw(void) {
+#ifndef SYS_fork
+#define SYS_fork 2
+#endif
+    return (int)syscall(SYS_fork);
+}
+
+int aegis_mount_points(char *out, size_t outSize) {
+    if (!out || outSize == 0) return 0;
+    out[0] = '\0';
+
+    int count = getfsstat(NULL, 0, MNT_NOWAIT);
+    if (count <= 0) return 0;
+
+    struct statfs *buf = (struct statfs *)malloc(sizeof(struct statfs) * (size_t)count);
+    if (!buf) return 0;
+
+    int n = getfsstat(buf, sizeof(struct statfs) * count, MNT_NOWAIT);
+    if (n <= 0) { free(buf); return 0; }
+
+    size_t written = 0;
+    for (int i = 0; i < n; i++) {
+        const char *p = buf[i].f_mntonname;
+        size_t len = strlen(p);
+        if (written + len + 2 >= outSize) break;
+        memcpy(out + written, p, len);
+        written += len;
+        out[written++] = '\n';
+    }
+    free(buf);
+    out[written] = '\0';
+    return (int)written;
 }

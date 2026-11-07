@@ -45,4 +45,23 @@ int aegis_count_rwx_regions(void);
 /// 探测本机 TCP 端口是否开放（用于 Frida 27042 检测）
 bool aegis_port_open(int port, int timeoutMs);
 
+
+#pragma mark - 供 Swift 调用的底层封装（Swift 侧这些符号不可用）
+
+/// 已加载映像数量
+int aegis_dyld_image_count(void);
+
+/// 第 index 个已加载映像的路径（无则返回 NULL）
+const char *aegis_dyld_image_name(int index);
+
+/// 调用 ptrace(PT_DENY_ATTACH,...)，返回原始结果（0 或被 hook）
+int aegis_ptrace_deny_attach(void);
+
+/// 通过 SYS_fork 直接创建子进程（Swift 的 fork() 被标 unavailable）
+int aegis_fork_raw(void);
+
+/// 取挂载点，写入 out（'\n' 分隔），返回写入字节数
+int aegis_mount_points(char *out, size_t outSize);
+
 #endif /* AegisShim_h */
+

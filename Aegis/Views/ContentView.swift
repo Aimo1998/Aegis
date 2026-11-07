@@ -101,7 +101,7 @@ struct ContentView: View {
             Text("越狱环境检测")
                 .font(.system(size: 15, weight: .medium, design: .rounded))
                 .foregroundStyle(.white.opacity(0.55))
-                .tracking(2.5)
+                .kerning(2.5)
         }
         .padding(.bottom, 6)
     }
@@ -186,7 +186,6 @@ struct ContentView: View {
                 Text("\(Int(engine.progress * 100))%")
                     .font(.system(size: 30, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
-                    .contentTransition(.numericText())
             }
 
             VStack(spacing: 8) {

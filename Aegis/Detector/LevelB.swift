@@ -49,11 +49,11 @@ enum LevelB {
         name: "动态库注入扫描",
         detail: "遍历 _dyld_image_count 枚举所有已加载的 dylib，匹配 ElleKit / MobileSubstrate / Substitute / libhooker 等特征。",
         run: {
-            let count = _dyld_image_count()
+            let count = Int(aegis_dyld_image_count())
             var hits: [String] = []
 
             for i in 0..<count {
-                guard let cname = _dyld_get_image_name(i) else { continue }
+                guard let cname = aegis_dyld_image_name(Int32(i)) else { continue }
                 let name = String(cString: cname).lowercased()
 
                 // 我们的 App 自身与系统库白名单
@@ -134,7 +134,7 @@ enum LevelB {
             }
 
             // ptrace PT_DENY_ATTACH 自检：正常返回 0 或 EPERM；被 hook 时常见返回 0 且无副作用
-            let ptRet = ptrace(PT_DENY_ATTACH, 0, nil, nil)
+            let ptRet = aegis_ptrace_deny_attach()
             if ptRet == 0 && getppid() != 1 {
                 // 父进程不是 launchd 且 ptrace 返回 0，存在被绕过嫌疑
                 reasons.append("PT_DENY_ATTACH 返回值异常")
@@ -225,7 +225,7 @@ enum LevelB {
             }
 
             // 挂载表检查
-            if let mounts = aegis_mount_points() {
+            if let mounts = aegisFetchMounts() {
                 for m in mounts {
                     let lower = m.lowercased()
                     if lower.contains("jbroot") || lower.contains("/var/jb") || lower.contains("procursus") {
@@ -242,24 +242,13 @@ enum LevelB {
 
 // MARK: - 辅助
 
-/// 通过 getfsstat 取挂载点
-func aegis_mount_points() -> [String]? {
-    let count = getfsstat(nil, 0, MNT_NOWAIT)
-    guard count > 0 else { return nil }
-
-    var buf = [statfs](repeating: statfs(), count: Int(count))
-    let size = Int32(MemoryLayout<statfs>.stride * Int(count))
-    let n = buf.withUnsafeMutableBufferPointer { ptr -> Int32 in
-        getfsstat(ptr.baseAddress, size, MNT_NOWAIT)
+/// 通过 C shim 取挂载点（Swift 侧 getfsstat 签名难对齐）
+func aegisFetchMounts() -> [String]? {
+    var buf = [CChar](repeating: 0, count: 32768)
+    let n = buf.withUnsafeMutableBufferPointer { p -> Int32 in
+        aegis_mount_points(p.baseAddress, size_t(32768))
     }
     guard n > 0 else { return nil }
-
-    return (0..<Int(n)).map { i in
-        var fs = buf[i]
-        return withUnsafePointer(to: &fs.f_mntonname) { p -> String in
-            p.withMemoryRebound(to: CChar.self, capacity: Int(MAXPATHLEN)) {
-                String(cString: $0)
-            }
-        }
-    }
+    let raw = String(cString: buf)
+    return raw.split(separator: "\n").map(String.init)
 }

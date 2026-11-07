@@ -172,7 +172,7 @@ enum LevelC {
         name: "子进程创建",
         detail: "调用 fork()。iOS 沙盒内应用禁止创建子进程，返回成功即为异常。",
         run: {
-            let pid = fork()
+            let pid = aegis_fork_raw()
             if pid == 0 {
                 // 子进程立刻退出，不留垃圾进程
                 _exit(0)

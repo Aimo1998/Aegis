@@ -167,7 +167,7 @@ enum LevelA {
             }
 
             // 2. 挂载表
-            if let mounts = aegis_mount_points() {
+            if let mounts = aegisFetchMounts() {
                 var dynamicCount = 0
                 for m in mounts {
                     let lower = m.lowercased()
