@@ -21,6 +21,9 @@
 - **计时攻击检测**：用 `mach_absolute_time` 采样，返回值能伪造，耗时伪造不了
 - **IMP 归属校验**：拿关键 selector 的 IMP 反查 `dladdr`，判断方法有没有被重定向到越狱路径下的 dylib
 - **零第三方依赖**：纯 SwiftUI + Darwin + DeviceCheck
+- **报告导出**：纯文本 / JSON / 摘要三种格式，点击即复制到剪贴板并弹系统分享面板
+- **单项重测**：结果页展开任意未通过项，可只重跑这一项，报告原地更新
+- **中英双语**：28 项检测的名称、原理、绕过说明全部双语，运行时切换无需重启
 - **系统信息诊断页**：把所有检测依赖的底层返回值（sysctl / csops / lstat-vs-syscall / 挂载表 / 进程表）原样列出，便于核对判定是否准确
 - **底层全走 C shim**：`fork` / `ptrace` / `_dyld_*` / `getfsstat` 在 Swift 里被标 unavailable 或签名难对齐，统一由 `AegisShim.c` 封装
 
@@ -108,6 +111,56 @@ uicache -p /var/jb/Applications/Aegis.app
 或直接把 ipa 丢给 TrollStore。
 
 > 未签名 ipa 用系统安装器点「安装」会失败，属正常现象——iOS 只接受已签名 App。
+
+---
+
+## 报告导出
+
+结果页底部有三个按钮，点击后**立即写入剪贴板**并弹出系统分享面板：
+
+| 格式 | 内容 |
+|---|---|
+| 完整报告 | 时间 / 设备 / 系统 / 等级 / 风险分 / 每项的 ID、名称、权重、证据、原理、绕过 |
+| JSON | 结构化数据，`items` 数组里每个检测项一条，适合程序处理 |
+| 摘要 | 精简版，只列未通过项和证据，适合贴到聊天里 |
+
+```
+Aegis · 🟡 B 级 · 动态环境 · 23/100 低风险
+iPhone X (iPhone10,3) / iOS 16.7.8
+通过 9 / 未通过 3
+
+❌ B1 无根路径探测
+   /var/jb、/var/jb/usr、/var/jb/usr/lib、/var/jb/Library
+❌ B10 二进制加密状态
+   Mach-O 未加密（cryptid=0，非 App Store 分发）
+```
+
+JSON 里的 `version` 字段读自 `CFBundleShortVersionString`，不会和 App 版本脱节。
+
+---
+
+## 单项重测
+
+展开任意 ❌ 项，底部有「重测此项」。只重跑当前这一项，报告原地更新、评分重新计算，不用整级重扫。
+
+适合场景：改了环境（关掉 Frida、卸载某个 tweak）后想确认某一项的变化，而不想等 28 项跑完。
+
+---
+
+## 对比模式
+
+菜单第四项。把另一台设备导出的「摘要」粘进来，逐项对比：
+
+```
+Failed on both · 3
+  B1   无根路径探测
+  B10  二进制加密状态
+  B12  本地服务端口
+```
+
+分四组输出：A 有问题 B 正常 / B 有问题 A 正常 / 两边都未通过 / 两边都通过。
+
+解析器同时兼容中文 `设备    : ` 和英文 `Device  : ` 两种前缀。
 
 ---
 
@@ -220,6 +273,26 @@ RootHide 一类方案能在返回值和文件属性上做手脚，但**无法同
 
 ---
 
+## 校准记录
+
+v1.2.0 在 iPhone X / iOS 16.7.8 / Dopamine rootless 上实测后修正的项：
+
+| 项 | 原问题 | 修法 |
+|---|---|---|
+| C5 | `hw.model` 在 iOS 上返回平台代号（D22AP），不是机型 | 改用 `hw.machine`，且只认明确的模拟器架构 |
+| C3 | `/tmp` 是沙盒内 tmp 的符号链接，写入必然成功 | 移除该探测目标 |
+| B7 | Dopamine 的 `/var/jb` 本就指向 `/private/preboot/...` | 排除指向 preboot 的链接 |
+| B10 | 沙盒内读不到 `/var/jb`，检查永远失败 | 改为读 `LC_ENCRYPTION_INFO_64` 的 cryptid |
+| B11 | 阈值 420 太严，越狱设备正常就有 500+ | 提到 700 |
+| B4 | 与 B12 重复扫描 Frida 端口，同一证据算两次分 | 端口归 B12，B4 只看调试标志 |
+| B9 | 配置问题被当越狱证据 | 权重 6 → 1 |
+| A4 | 拿 lstat 和 getpid 比耗时，25000 倍是正常值 | 改为三条 lstat 路径互比 |
+| A8 | dladdr 解析失败时整轮跳过，会被误读成"全部一致" | 加解析率自检，低于 25% 直接报 |
+| A11 | ldid 空签名没有 application-identifier，被当重签名 | 缺失不再判异常 |
+| A2 | ad-hoc 签名必然缺 CS_RESTRICT，被当越狱 | 只判内核强制的位 |
+
+---
+
 ## 目录结构
 
 ```
@@ -242,14 +315,19 @@ Aegis/
     │   ├── ScanEngine.swift         # 扫描调度
     │   ├── DylibScanner.swift       # 已加载映像枚举与分类
     │   ├── HistoryStore.swift       # 历史记录 + 权重/绕过元数据
-    │   └── RedTeam.swift            # 自我篡改与注入可见性测试
+    │   ├── RedTeam.swift            # 自我篡改与注入可见性测试
+    │   ├── ReportExport.swift       # 报告导出（文本 / JSON / 摘要）
+    │   ├── L10n.swift               # 中英双语
+    │   └── DetectorTextEN.swift     # 28 项的英文原理与绕过
     └── Views/
         ├── ContentView.swift        # 顶栏 + 汉堡菜单 + 首页 + 扫描中
         ├── ResultView.swift         # 结果页（评分卡 + 展开证据/绕过）
         ├── DylibListView.swift      # 注入库清单
         ├── HistoryView.swift        # 历史记录与变化对比
         ├── RedTeamView.swift        # 红队自测
-        └── SystemInfoView.swift     # 系统信息诊断
+        ├── SystemInfoView.swift     # 系统信息诊断
+        ├── CompareView.swift        # 两台设备报告对比
+        └── SharedFooter.swift       # 全局署名
 ```
 
 ---
