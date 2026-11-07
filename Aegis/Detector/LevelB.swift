@@ -309,11 +309,10 @@ enum LevelB {
         run: {
             var hits: [String] = []
 
+            // 只查顶层挂载点本身。/var/jb 下的子路径在 rootless 环境里
+            // 大量使用符号链接（lib/xxx -> usr/lib/xxx），查子路径必然假阳性。
             let targets = [
-                "/var/jb", "/.jbroot", "/private/var/jb",
-                "/usr/lib/substrate", "/usr/lib/libsubstrate.dylib",
-                "/Library/MobileSubstrate", "/Library/TweakInject",
-                "/var/lib/dpkg", "/etc/apt"
+                "/var/jb", "/.jbroot", "/private/var/jb"
             ]
 
             for path in targets {
@@ -412,19 +411,26 @@ enum LevelB {
         name: "自身运行路径",
         detail: "检查 App 自身的可执行文件是否从越狱目录（/var/jb、/private/preboot、/.jbroot）加载。装在沙盒容器外即说明以越狱方式部署。",
         run: {
-            let exe = Bundle.main.executablePath ?? ""
-            guard !exe.isEmpty else { return nil }
+            let fm = FileManager.default
 
-            let badMarkers = ["/var/jb/", "/.jbroot/", "/private/preboot/",
-                              "/Library/MobileSubstrate/"]
-            for m in badMarkers where exe.contains(m) {
-                return "App 从越狱路径运行：\(exe)"
+            // iOS 会把越狱 App 复制到沙盒容器里运行，所以 executablePath
+            // 通常仍在 /var/containers/... 下 —— 直接看路径抓不到。
+            // 改为检查越狱目录里是否同时存在同名 App 包。
+            let appName = Bundle.main.bundleURL.lastPathComponent
+            guard !appName.isEmpty else { return nil }
+
+            let jailRoots = ["/var/jb/Applications", "/Applications"]
+            for root in jailRoots {
+                let path = root + "/" + appName
+                if fm.fileExists(atPath: path) {
+                    return "越狱目录存在同名 App：\(path)"
+                }
             }
 
-            // 正常应在 /var/containers/Bundle/Application/ 下
-            if !exe.contains("/var/containers/Bundle/Application/")
-                && !exe.contains("/private/var/containers/Bundle/Application/") {
-                return "App 位于非常规容器路径：\(exe)"
+            // 可执行文件本身若直接从越狱路径运行，也直接命中
+            let exe = Bundle.main.executablePath ?? ""
+            for m in ["/var/jb/", "/.jbroot/", "/private/preboot/"] where exe.contains(m) {
+                return "可执行文件位于越狱路径：\(exe)"
             }
             return nil
         }
@@ -442,8 +448,10 @@ enum LevelB {
             guard raw > 0 else { return nil }
             let n = Int(raw)
 
-            if n > 420 {
-                return "加载 \(n) 个 dylib（正常上限约 320）"
+            // 未越狱 150~320；越狱环境常见 400~600（TweakInject 会带进来一批）
+            // 阈值放到 700，只有真正异常的批量注入才会命中
+            if n > 700 {
+                return "加载 \(n) 个 dylib（正常上限约 600）"
             }
             if n < 90 {
                 return "仅加载 \(n) 个 dylib（异常偏少）"

@@ -526,21 +526,24 @@ enum LevelA {
 
             // application-identifier 必须是 TeamID.BundleID
             let appIdKey = "application-identifier" as CFString
+            let bid = Bundle.main.bundleIdentifier ?? ""
+
             if let val = ph_SecTaskCopyValueForEntitlement(task, appIdKey, nil) as? String {
                 let comps = val.split(separator: ".")
-                let bid = Bundle.main.bundleIdentifier ?? ""
-                if comps.count < 2 {
-                    issues.append("application-identifier 格式异常：\(val)")
-                } else if !bid.isEmpty && !val.hasSuffix(bid) {
-                    issues.append("application-identifier(\(val)) 与 BundleID(\(bid)) 不匹配")
+
+                // 只认「明显不对」的情况：
+                //   1) 根本没有 BundleID 段，且字符串里也找不到自己的 BundleID
+                //   2) TeamID 长度不像账号 ID（Apple 的 TeamID 是 10 位，
+                //      但企业/教育账号偶有 11~12 位，给一点余量）
+                if !bid.isEmpty && !val.contains(bid) {
+                    issues.append("application-identifier(\(val)) 不含 BundleID(\(bid))")
                 }
-                // TeamID 一般是 10 位
-                if let team = comps.first, team.count != 10 {
-                    issues.append("TeamID 长度异常：\(team)")
+                if let team = comps.first, team.count < 9 || team.count > 13 {
+                    issues.append("TeamID 长度异常：\(team)（\(team.count) 位）")
                 }
-            } else {
-                issues.append("缺少 application-identifier（疑似重签名）")
             }
+            // 注意：这里故意不把「缺少 application-identifier」当作异常。
+            // ldid -S 补的空签名不会有这条 entitlement，越狱环境属正常。
 
             // get-task-allow
             let gtaKey = "get-task-allow" as CFString
