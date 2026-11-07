@@ -8,6 +8,7 @@
 import Foundation
 import UIKit
 import Darwin
+import LocalAuthentication
 
 enum LevelC {
 
@@ -226,36 +227,51 @@ enum LevelC {
 
     // MARK: C5 · 模拟器与硬件指纹
 
+    /// 读取字符串类型的 sysctl
+    private static func sysctlString(_ name: String) -> String? {
+        var size = 0
+        guard sysctlbyname(name, nil, &size, nil, 0) == 0, size > 0 else { return nil }
+        var buf = [CChar](repeating: 0, count: size)
+        guard sysctlbyname(name, &buf, &size, nil, 0) == 0 else { return nil }
+        return String(cString: buf)
+    }
+
     static let simulatorHardwareCheck = Detector(
         id: "C5",
         level: .c,
         name: "模拟器与硬件指纹",
-        detail: "检查是否运行在模拟器（TARGET_OS_SIMULATOR / hw.machine），并验证设备是否存在真实的 Secure Enclave 与生物识别硬件。模拟器无法通过此项。",
+        detail: "检查是否运行在模拟器（TARGET_OS_SIMULATOR / hw.machine / hw.model），并通过 LocalAuthentication 的 biometryType 判断是否存在真实生物识别硬件（Touch ID / Face ID）。模拟器无法通过此项。",
         run: {
             var reasons: [String] = []
 
             #if targetEnvironment(simulator)
-            reasons.append("编译目标为模拟器")
+            reasons.append("编译目标为模拟器（TARGET_OS_SIMULATOR）")
             #endif
 
-            var size = 0
-            if sysctlbyname("hw.machine", nil, &size, nil, 0) == 0, size > 0 {
-                var buf = [CChar](repeating: 0, count: size)
-                if sysctlbyname("hw.machine", &buf, &size, nil, 0) == 0 {
-                    let machine = String(cString: buf)
-                    if machine == "x86_64" || machine == "arm64" || machine.hasPrefix("i386") {
-                        reasons.append("hw.machine = \(machine)（非真机型号）")
-                    }
+            // 1. hw.machine：模拟器为 x86_64 / arm64，真机为 iPhoneXX,X 之类
+            if let machine = sysctlString("hw.machine") {
+                if machine == "x86_64" || machine == "arm64" || machine.hasPrefix("i386") {
+                    reasons.append("hw.machine = \(machine)（非真机）")
                 }
             }
 
-            let bioFramework = "/System/Library/Frameworks/LocalAuthentication.framework/LocalAuthentication"
-            let hasBioHW = FileManager.default.fileExists(atPath: bioFramework)
+            // 2. hw.model：真机应以 iPhone / iPad / iPod 开头
+            if let model = sysctlString("hw.model") {
+                let isRealDevice = model.hasPrefix("iPhone")
+                    || model.hasPrefix("iPad")
+                    || model.hasPrefix("iPod")
+                    || model.hasPrefix("Mac")
+                if !isRealDevice {
+                    reasons.append("hw.model = \(model)（非 iOS 真机型号）")
+                }
+            }
 
-            var seSize = 0
-            let seRet = sysctlbyname("hw.optional.arm.FEAT_SME", nil, &seSize, nil, 0)
-            if seRet != 0 && !hasBioHW {
-                reasons.append("未检测到 Secure Enclave / 生物识别硬件")
+            // 3. 生物识别硬件：biometryType 反映硬件是否存在，
+            //    与「用户是否录入了指纹/面容」无关
+            let ctx = LAContext()
+            _ = ctx.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: nil)
+            if ctx.biometryType == .none {
+                reasons.append("无生物识别硬件（biometryType = none）")
             }
 
             guard !reasons.isEmpty else { return nil }

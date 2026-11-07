@@ -45,3 +45,5 @@ targets:
         OTHER_LDFLAGS:
           - "-framework"
           - "DeviceCheck"
+          - "-framework"
+          - "LocalAuthentication"
