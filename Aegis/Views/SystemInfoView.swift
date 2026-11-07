@@ -291,6 +291,8 @@ struct SystemInfoView: View {
                     ForEach(sections) { section in
                         sectionView(section)
                     }
+
+                    MadeByFooter()
                 }
             }
             .padding(.horizontal, 16)

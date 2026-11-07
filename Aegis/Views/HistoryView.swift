@@ -24,6 +24,8 @@ struct HistoryView: View {
                         entryCard(entry)
                     }
                 }
+
+                MadeByFooter()
             }
             .padding(.horizontal, 16)
             .padding(.top, 12)

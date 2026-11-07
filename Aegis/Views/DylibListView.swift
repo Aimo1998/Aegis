@@ -38,6 +38,8 @@ struct DylibListView: View {
                         sectionView(category: group.0, items: group.1)
                     }
                 }
+
+                MadeByFooter()
             }
             .padding(.horizontal, 16)
             .padding(.top, 12)

@@ -39,6 +39,8 @@ struct RedTeamView: View {
                 if let r = tamperResult, !r.detected {
                     warningCard
                 }
+
+                MadeByFooter()
             }
             .padding(.horizontal, 16)
             .padding(.top, 12)

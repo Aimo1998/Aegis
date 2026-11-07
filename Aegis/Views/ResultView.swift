@@ -30,6 +30,7 @@ struct ResultView: View {
 
                 rescanButton
                 footer
+                MadeByFooter()
             }
             .padding(.horizontal, 20)
             .padding(.top, 34)

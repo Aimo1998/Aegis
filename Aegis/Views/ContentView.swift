@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 /// 主模式
 enum AppMode: String, CaseIterable, Identifiable {
@@ -135,7 +136,8 @@ struct ContentView: View {
         ZStack {
             Color(red: 0.07, green: 0.08, blue: 0.13).ignoresSafeArea()
 
-            VStack(spacing: 10) {
+            ScrollView {
+                VStack(spacing: 10) {
                 HStack {
                     Text("模式")
                         .font(.system(size: 17, weight: .bold, design: .rounded))
@@ -194,8 +196,69 @@ struct ContentView: View {
                     .padding(.horizontal, 16)
                 }
 
+                githubRow
+
                 Spacer(minLength: 8)
+                }
             }
+        }
+    }
+
+    // MARK: GitHub 跳转
+
+    private var githubRow: some View {
+        Button {
+            openAuthorGitHub()
+        } label: {
+            HStack(spacing: 13) {
+                Image(systemName: "link")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.55))
+                    .frame(width: 26)
+
+                Text("跳转至作者Github")
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white)
+
+                Spacer()
+
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.3))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    .fill(Color.white.opacity(0.035))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 13, style: .continuous)
+                            .stroke(Color.white.opacity(0.04), lineWidth: 1)
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 16)
+        .padding(.top, 4)
+    }
+
+    /// 三级跳转：GitHub App 用户页 → GitHub App 首页 → 默认浏览器
+    private func openAuthorGitHub() {
+        let candidates = [
+            "github://Aimo1998",        // 部分版本支持直达用户页
+            "github://"                 // 只要 App 在，至少能打开
+        ]
+
+        for candidate in candidates {
+            guard let url = URL(string: candidate),
+                  UIApplication.shared.canOpenURL(url) else { continue }
+            UIApplication.shared.open(url, options: [:], completionHandler: nil)
+            return
+        }
+
+        // 没装 GitHub App，退回默认浏览器
+        if let webURL = URL(string: "https://github.com/Aimo1998") {
+            UIApplication.shared.open(webURL, options: [:], completionHandler: nil)
         }
     }
 
@@ -221,6 +284,7 @@ struct ContentView: View {
                 levelPicker
                 startButton
                 footerNote
+                MadeByFooter()
             }
             .padding(.horizontal, 20)
             .padding(.top, 24)
