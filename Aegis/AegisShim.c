@@ -8,7 +8,6 @@
 #include "AegisShim.h"
 
 #include <sys/syscall.h>
-#include <sys/ptrace.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/sysctl.h>
@@ -153,6 +152,13 @@ bool aegis_port_open(int port, int timeoutMs) {
     return r == 0;
 }
 
+// iOS SDK 不提供 <sys/ptrace.h>，这里自行声明原型
+// 符号本身存在于 libsystem_kernel，链接期可解析
+extern int ptrace(int _request, int _pid, void *_addr, int _data);
+#ifndef PT_DENY_ATTACH
+#define PT_DENY_ATTACH 31
+#endif
+
 #pragma mark - Swift 不可用符号的封装
 
 int aegis_dyld_image_count(void) {
@@ -164,10 +170,7 @@ const char *aegis_dyld_image_name(int index) {
 }
 
 int aegis_ptrace_deny_attach(void) {
-#ifndef PT_DENY_ATTACH
-#define PT_DENY_ATTACH 31
-#endif
-    return (int)ptrace(PT_DENY_ATTACH, 0, 0, 0);
+    return ptrace(PT_DENY_ATTACH, 0, (void *)0, 0);
 }
 
 int aegis_fork_raw(void) {
