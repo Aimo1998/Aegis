@@ -25,6 +25,14 @@
 #include <mach-o/dyld.h>
 #include <mach-o/loader.h>
 
+// 不同 iOS SDK 版本可能未导出这些宏，做一层兜底
+#ifndef SYS_lstat
+#define SYS_lstat 190
+#endif
+#ifndef SYS_stat
+#define SYS_stat 188
+#endif
+
 #pragma mark - 原始 syscall 封装
 
 int aegis_raw_lstat(const char *path, void *statBuf) {

@@ -214,9 +214,9 @@ enum LevelB {
             var hits: [String] = []
 
             for path in rootlessCandidates {
-                var st = stat()
+                var st = Darwin.stat()
                 let r = withUnsafeMutablePointer(to: &st) { p -> Int32 in
-                    aegis_raw_lstat(path, p)
+                    aegis_raw_lstat(path, UnsafeMutableRawPointer(p))
                 }
                 if r == 0 {
                     // /var/jb 在真机上仅越狱环境存在

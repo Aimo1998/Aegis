@@ -7,6 +7,7 @@
 
 import Foundation
 import UIKit
+import Darwin
 
 enum LevelC {
 
@@ -78,7 +79,7 @@ enum LevelC {
         run: {
             var hits: [String] = []
             for path in blacklistPaths {
-                var st = stat()
+                var st = Darwin.stat()
                 if lstat(path, &st) == 0 {
                     hits.append(path)
                 }

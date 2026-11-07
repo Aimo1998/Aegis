@@ -58,7 +58,7 @@ enum LevelA {
 
                 let rLibc = lstat(path, &stLibc)
                 let rRaw = withUnsafeMutablePointer(to: &stRaw) { p -> Int32 in
-                    aegis_raw_lstat(path, p)
+                    aegis_raw_lstat(path, UnsafeMutableRawPointer(p))
                 }
 
                 // 1. 返回值本身不一致
@@ -78,7 +78,7 @@ enum LevelA {
 
             // 3. FileManager 与 lstat 交叉
             for path in ["/var/jb", "/.jbroot"] {
-                var st = stat()
+                var st = Darwin.stat()
                 let existsByStat = lstat(path, &st) == 0
                 let existsByFM = FileManager.default.fileExists(atPath: path)
                 if existsByStat != existsByFM {
@@ -101,7 +101,7 @@ enum LevelA {
         run: {
             var flags: UInt32 = 0
             let ret = withUnsafeMutablePointer(to: &flags) { p -> Int32 in
-                aegis_csops(UInt32(getpid()), CS_OPS_STATUS, p, 4)
+                aegis_csops(UInt32(getpid()), CS_OPS_STATUS, UnsafeMutableRawPointer(p), 4)
             }
 
             guard ret == 0 else {
