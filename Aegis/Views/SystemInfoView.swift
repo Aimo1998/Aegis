@@ -174,7 +174,7 @@ enum SystemInfoCollector {
             return s.isEmpty ? nil : "\(k)=\(s)"
         }
         items.append(InfoItem(key: T("DYLD_* 变量", "DYLD_* vars"),
-                              value: set.isEmpty ? T("未设置", "not set") : "\(set.count)"),
+                              value: set.isEmpty ? T("未设置", "not set") : "\(set.count) " + T("个", "vars"),
                               note: set.first))
 
         return InfoSection(title: L10n.shared.t("运行时", "Runtime"), icon: "cpu", items: items)
