@@ -9,7 +9,6 @@ import Foundation
 import Darwin
 import DeviceCheck
 
-
 // Swift 无法使用 C 的 #define 数值宏，这里等价定义一份
 private let AEGIS_RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: -2)!
 private let CS_OPS_STATUS: UInt32 = 0x00000000
@@ -18,6 +17,8 @@ private let CS_HARD: UInt32      = 0x00000100
 private let CS_KILL: UInt32      = 0x00000200
 private let CS_RESTRICT: UInt32  = 0x00000800
 private let CS_DEBUGGED: UInt32  = 0x10000000
+private let CS_PLATFORM: UInt32  = 0x00000400
+private let CS_INSTALLER: UInt32 = 0x00080000
 
 enum LevelA {
 
@@ -25,13 +26,13 @@ enum LevelA {
         apiCrossValidation,
         codeSignatureCheck,
         kernelStateCheck,
+        timingAttackCheck,
         antiTamperCheck,
         appAttestCheck
     ]
 
-    // MARK: A1 · API 交叉验证（反 Hook）
+    // MARK: A1 · API 交叉验证
 
-    /// 交叉验证用路径（既有越狱特征，也有系统正常路径做对照）
     private static let probePaths = [
         "/var/jb",
         "/.jbroot",
@@ -40,34 +41,32 @@ enum LevelA {
         "/bin/bash",
         "/var/jb/usr/lib",
         "/private/var/jb",
-        "/usr/lib/libSystem.B.dylib",      // 正常对照
-        "/System/Library/CoreServices"     // 正常对照
+        "/usr/lib/libSystem.B.dylib",
+        "/System/Library/CoreServices"
     ]
 
     static let apiCrossValidation = Detector(
         id: "A1",
         level: .a,
         name: "API 交叉验证",
-        detail: "同一路径分别用 libc 的 lstat 与原始 SYS_lstat 查询，比对返回值、inode 与文件类型。RootHide 一类方案常只 Hook 其中一条路径，两边结果必然矛盾。",
+        detail: "同一路径分别用 libc 的 lstat 与原始 SYS_lstat 查询，比对返回值、inode 与文件类型；再用 FileManager 做第三重交叉。RootHide 一类方案常只 Hook 其中一条路径，两边结果必然矛盾。",
         run: {
             var mismatches: [String] = []
 
             for path in probePaths {
-                var stLibc = stat()
-                var stRaw = stat()
+                var stLibc = Darwin.stat()
+                var stRaw = Darwin.stat()
 
                 let rLibc = lstat(path, &stLibc)
                 let rRaw = withUnsafeMutablePointer(to: &stRaw) { p -> Int32 in
                     aegis_raw_lstat(path, UnsafeMutableRawPointer(p))
                 }
 
-                // 1. 返回值本身不一致
                 if rLibc != rRaw {
                     mismatches.append("\(path): lstat=\(rLibc) raw=\(rRaw)")
                     continue
                 }
 
-                // 2. 都成功但 inode / 类型不一致
                 if rLibc == 0 && rRaw == 0 {
                     if stLibc.st_ino != stRaw.st_ino ||
                        (stLibc.st_mode & S_IFMT) != (stRaw.st_mode & S_IFMT) {
@@ -76,13 +75,12 @@ enum LevelA {
                 }
             }
 
-            // 3. FileManager 与 lstat 交叉
             for path in ["/var/jb", "/.jbroot"] {
                 var st = Darwin.stat()
-                let existsByStat = lstat(path, &st) == 0
-                let existsByFM = FileManager.default.fileExists(atPath: path)
-                if existsByStat != existsByFM {
-                    mismatches.append("\(path): FileManager(\(existsByFM)) 与 lstat(\(existsByStat)) 矛盾")
+                let byStat = lstat(path, &st) == 0
+                let byFM = FileManager.default.fileExists(atPath: path)
+                if byStat != byFM {
+                    mismatches.append("\(path): FileManager(\(byFM)) 与 lstat(\(byStat)) 矛盾")
                 }
             }
 
@@ -91,13 +89,13 @@ enum LevelA {
         }
     )
 
-    // MARK: A2 · 代码签名与信任链
+    // MARK: A2 · 代码签名与 TrustCache
 
     static let codeSignatureCheck = Detector(
         id: "A2",
         level: .a,
-        name: "代码签名审查",
-        detail: "通过 csops(CS_OPS_STATUS) 读取进程 csflags，检查 CS_VALID 是否被强行注入、CS_DEBUGGED 是否被抹除，以及 CS_HARD/CS_KILL 是否被剥离（RootHide 常见手法）。",
+        name: "代码签名与 TrustCache",
+        detail: "通过 csops(CS_OPS_STATUS) 读取 csflags，检查 CS_VALID 是否被强行注入、CS_DEBUGGED 是否被抹除、CS_HARD/CS_KILL 是否被剥离；同时判断是否缺少 CS_PLATFORM/CS_INSTALLER（ad-hoc 被塞进 TrustCache 的典型特征）。",
         run: {
             var flags: UInt32 = 0
             let ret = withUnsafeMutablePointer(to: &flags) { p -> Int32 in
@@ -105,28 +103,18 @@ enum LevelA {
             }
 
             guard ret == 0 else {
-                // csops 本身失败，说明系统调用层已被干预
-                return "csops 调用失败 errno=\(errno)"
+                return "csops 调用失败 errno=\(errno)（系统调用层被干预）"
             }
 
             var issues: [String] = []
 
-            if (flags & CS_VALID) == 0 {
-                issues.append("CS_VALID 未置位")
-            }
-            if (flags & CS_DEBUGGED) != 0 {
-                issues.append("CS_DEBUGGED 已置位（被调试签名）")
-            }
-            if (flags & CS_HARD) == 0 {
-                issues.append("CS_HARD 缺失（可被动态修改）")
-            }
-            if (flags & CS_KILL) == 0 {
-                issues.append("CS_KILL 缺失")
-            }
-
-            // 额外：检查是否被注入 ad-hoc 签名标记
-            if (flags & CS_RESTRICT) == 0 {
-                issues.append("CS_RESTRICT 缺失（非正常受限签名）")
+            if (flags & CS_VALID) == 0 { issues.append("CS_VALID 未置位") }
+            if (flags & CS_DEBUGGED) != 0 { issues.append("CS_DEBUGGED 已置位") }
+            if (flags & CS_HARD) == 0 { issues.append("CS_HARD 缺失") }
+            if (flags & CS_KILL) == 0 { issues.append("CS_KILL 缺失") }
+            if (flags & CS_RESTRICT) == 0 { issues.append("CS_RESTRICT 缺失") }
+            if (flags & CS_PLATFORM) == 0 && (flags & CS_INSTALLER) == 0 {
+                issues.append("无 CS_PLATFORM/CS_INSTALLER（疑似 ad-hoc 入 TrustCache）")
             }
 
             guard !issues.isEmpty else { return nil }
@@ -144,7 +132,6 @@ enum LevelA {
         run: {
             var issues: [String] = []
 
-            // 1. kern.bootargs
             var buf = [CChar](repeating: 0, count: 4096)
             var outLen: size_t = 0
             let ok = buf.withUnsafeMutableBufferPointer { p -> Bool in
@@ -152,13 +139,10 @@ enum LevelA {
             }
 
             if ok {
-                var bootargs = String(cString: buf).lowercased()
-                if bootargs.isEmpty { bootargs = "" }
-
+                let bootargs = String(cString: buf).lowercased()
                 let markers = [
-                    "-s", "amfi_get_out_of_my_way", "cs_enforcement_disable",
-                    "kextlog", "debug=0x144", "pmap_pagetable_corruption",
-                    "kpf", "jit"
+                    "amfi_get_out_of_my_way", "cs_enforcement_disable",
+                    "kextlog", "debug=0x144", "kpf"
                 ]
                 for m in markers where bootargs.contains(m) {
                     issues.append("bootargs 含 \(m)")
@@ -166,19 +150,13 @@ enum LevelA {
                 }
             }
 
-            // 2. 挂载表
             if let mounts = aegisFetchMounts() {
-                var dynamicCount = 0
                 for m in mounts {
                     let lower = m.lowercased()
-                    if lower.contains("jbroot") ||
-                       lower.contains("/var/jb") ||
-                       lower.contains("procursus") ||
-                       lower.contains("libhooker") {
-                        dynamicCount += 1
-                        if dynamicCount == 1 {
-                            issues.append("挂载点异常：\(m)")
-                        }
+                    if lower.contains("jbroot") || lower.contains("/var/jb")
+                        || lower.contains("procursus") || lower.contains("libhooker") {
+                        issues.append("挂载点异常：\(m)")
+                        break
                     }
                 }
             }
@@ -188,43 +166,90 @@ enum LevelA {
         }
     )
 
-    // MARK: A4 · 反-反调试 / 指针完整性
+    // MARK: A4 · 计时攻击检测
 
-    static let antiTamperCheck = Detector(
+    private static func measureNs(iterations: Int, _ block: () -> Void) -> Double {
+        let t0 = mach_absolute_time()
+        for _ in 0..<iterations { block() }
+        let t1 = mach_absolute_time()
+
+        var tb = mach_timebase_info_data_t()
+        mach_timebase_info(&tb)
+        let numer = Double(tb.numer)
+        let denom = Double(tb.denom)
+        let ns = Double(t1 - t0) * numer / denom
+        return ns / Double(iterations)
+    }
+
+    static let timingAttackCheck = Detector(
         id: "A4",
         level: .a,
+        name: "计时攻击检测",
+        detail: "用 mach_absolute_time 对 stat 类调用连续采样，对比「正常系统路径」与「越狱特征路径」的单次耗时，并对比纯 syscall（getpid）基线。被 Hook 拦截的路径耗时会明显偏离正常区间。",
+        run: {
+            let iterations = 300
+            var st = Darwin.stat()
+
+            let normalNs = measureNs(iterations: iterations) {
+                _ = lstat("/System/Library", &st)
+            }
+            let jailNs = measureNs(iterations: iterations) {
+                _ = lstat("/var/jb", &st)
+            }
+            let sysNs = measureNs(iterations: iterations) {
+                _ = getpid()
+            }
+
+            var issues: [String] = []
+
+            if normalNs > 0 && sysNs > 0 {
+                let ratio = normalNs / sysNs
+                if ratio > 30 {
+                    issues.append(String(format: "正常路径 lstat 耗时异常 (%.1fx syscall)", ratio))
+                }
+            }
+
+            if normalNs > 0 && jailNs > 0 {
+                let ratio = jailNs / normalNs
+                if ratio > 4.0 {
+                    issues.append(String(format: "/var/jb 探测耗时 %.1fx 于正常路径（疑似 Hook 拦截）", ratio))
+                }
+                if ratio < 0.15 {
+                    issues.append(String(format: "/var/jb 探测耗时仅 %.2fx（疑似伪造返回）", ratio))
+                }
+            }
+
+            guard !issues.isEmpty else { return nil }
+            return issues.joined(separator: "；")
+        }
+    )
+
+    // MARK: A5 · 反-反调试与指针完整性
+
+    static let antiTamperCheck = Detector(
+        id: "A5",
+        level: .a,
         name: "防篡改与指针完整性",
-        detail: "检查关键 API 的函数地址是否仍落在合法映像范围内（检测 PAC 指针伪造 / 内联 Hook），并验证 dladdr 与 _dyld_get_image_name 的路径是否一致。",
+        detail: "检查 lstat/getfsstat/sysctl/ptrace/csops 等关键 API 的函数地址是否仍落在合法映像范围内（检测内联 Hook 与 PAC 指针伪造），并用 dladdr 交叉验证其来源库路径。",
         run: {
             var issues: [String] = []
 
-            // 1. 关键导入函数的地址归属
-            let probes: [(String, UnsafeMutableRawPointer?)] = [
-                ("lstat", dlsym(AEGIS_RTLD_DEFAULT, "lstat")),
-                ("getfsstat", dlsym(AEGIS_RTLD_DEFAULT, "getfsstat")),
-                ("sysctl", dlsym(AEGIS_RTLD_DEFAULT, "sysctl")),
-                ("ptrace", dlsym(AEGIS_RTLD_DEFAULT, "ptrace")),
-                ("csops", dlsym(AEGIS_RTLD_DEFAULT, "csops")),
-                ("_dyld_get_image_name", dlsym(AEGIS_RTLD_DEFAULT, "_dyld_get_image_name"))
-            ]
-
-            for (name, sym) in probes {
-                guard let sym = sym else {
-                    // 解析不到本身也不算异常（不同 iOS 版本符号可见性不同）
-                    continue
-                }
+            let names = ["lstat", "getfsstat", "sysctl", "ptrace", "csops"]
+            for name in names {
+                guard let sym = dlsym(AEGIS_RTLD_DEFAULT, name) else { continue }
                 let addr = UInt(bitPattern: sym)
                 if !aegis_address_in_image(addr) {
                     issues.append("\(name) 地址不在任何映像内（疑似 Hook）")
                 }
             }
 
-            // 2. dladdr 与 dyld 映像名交叉
             if let sym = dlsym(AEGIS_RTLD_DEFAULT, "lstat") {
                 var info = Dl_info()
                 if dladdr(sym, &info) != 0, let fname = info.dli_fname {
                     let path = String(cString: fname)
-                    if !path.hasPrefix("/usr/lib/") && !path.hasPrefix("/System/") {
+                    let lower = path.lowercased()
+                    if lower.contains("/var/jb") || lower.contains("/.jbroot")
+                        || lower.contains("substrate") || lower.contains("ellekit") {
                         issues.append("lstat 来源映像异常：\(path)")
                     }
                 }
@@ -235,20 +260,19 @@ enum LevelA {
         }
     )
 
-    // MARK: A5 · 设备完整性（App Attest）
+    // MARK: A6 · 设备完整性（App Attest）
 
     static let appAttestCheck = Detector(
-        id: "A5",
+        id: "A6",
         level: .a,
         name: "App Attest 完整性",
-        detail: "调用 Apple DeviceCheck / App Attest。需要付费开发者账号的 appattest entitlement；不可用时该项自动跳过（不计为通过也不计为失败）。",
+        detail: "调用 Apple DeviceCheck / App Attest。需要付费开发者账号的 appattest entitlement；不可用时该项自动跳过（不计通过也不计失败）。",
         run: {
-            // 模拟器直接跳过
             #if targetEnvironment(simulator)
             return nil
             #else
             let service = DCAppAttestService.shared
-            guard service.isSupported else { return nil }   // 无 entitlement，跳过
+            guard service.isSupported else { return nil }
 
             let sem = DispatchSemaphore(value: 0)
             var failure: String?

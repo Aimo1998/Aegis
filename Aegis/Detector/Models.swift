@@ -33,7 +33,7 @@ enum DetectionLevel: String, CaseIterable, Identifiable {
 
     var badge: String {
         switch self {
-        case .c: return "🛑"
+        case .c: return "🔵"
         case .b: return "🟡"
         case .a: return "🔴"
         }

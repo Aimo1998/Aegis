@@ -63,5 +63,8 @@ int aegis_fork_raw(void);
 /// 取挂载点，写入 out（'\n' 分隔），返回写入字节数
 int aegis_mount_points(char *out, size_t outSize);
 
+/// 取全部进程名，写入 out（'\n' 分隔），返回字节数
+int aegis_list_process_names(char *out, size_t outSize);
+
 #endif /* AegisShim_h */
 

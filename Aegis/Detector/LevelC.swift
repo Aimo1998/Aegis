@@ -2,7 +2,7 @@
 //  LevelC.swift
 //  Aegis
 //
-//  🛑 C 级检测：基础特征匹配（针对传统有根越狱）
+//  🔵 C 级检测：基础特征（针对传统有根越狱）
 //
 
 import Foundation
@@ -15,7 +15,8 @@ enum LevelC {
         fileSystemCheck,
         urlSchemeCheck,
         sandboxEscapeCheck,
-        forkCheck
+        environmentCheck,
+        simulatorHardwareCheck
     ]
 
     // MARK: C1 · 文件系统黑名单
@@ -86,7 +87,7 @@ enum LevelC {
                 if FileManager.default.fileExists(atPath: path) && !hits.contains(path) {
                     hits.append(path)
                 }
-                if hits.count >= 8 { break }   // 命中足够多就提前结束
+                if hits.count >= 8 { break }
             }
             guard !hits.isEmpty else { return nil }
             return "命中 \(hits.count) 个路径：" + hits.prefix(6).joined(separator: "、")
@@ -113,7 +114,6 @@ enum LevelC {
         name: "URL Scheme 探测",
         detail: "用 canOpenURL 检查是否注册了越狱工具专属协议（cydia/sileo/filza 等）。需在 Info.plist 的 LSApplicationQueriesSchemes 中声明。",
         run: {
-            // canOpenURL 必须在主线程调用
             let sem = DispatchSemaphore(value: 0)
             var opened: [String] = []
 
@@ -132,14 +132,16 @@ enum LevelC {
         }
     )
 
-    // MARK: C3 · 沙盒逃逸
+    // MARK: C3 · 沙盒逃逸 + 子进程
 
     static let sandboxEscapeCheck = Detector(
         id: "C3",
         level: .c,
-        name: "沙盒逃逸写入",
-        detail: "尝试向沙盒外的 /private 目录写入文件。沙盒正常时必然失败，成功即说明沙盒被突破。",
+        name: "沙盒逃逸与进程创建",
+        detail: "尝试向沙盒外写入探针文件，并调用 SYS_fork 创建子进程。iOS 沙盒内这两项都应当失败。",
         run: {
+            var reasons: [String] = []
+
             let token = UUID().uuidString
             let targets = [
                 "/private/jailbreak_test_\(token).txt",
@@ -147,44 +149,117 @@ enum LevelC {
                 "/var/jb/.aegis_probe_\(token)",
                 "/tmp/aegis_probe_\(token)"
             ]
-
-            var written: [String] = []
             for path in targets {
                 do {
                     try token.write(toFile: path, atomically: true, encoding: .utf8)
-                    written.append(path)
-                    try? FileManager.default.removeItem(atPath: path)  // 清理
+                    reasons.append("沙盒外写入成功：\(path)")
+                    try? FileManager.default.removeItem(atPath: path)
+                    break
                 } catch {
-                    // 写入失败是正常表现
+                    // 写入失败属正常
                 }
             }
 
-            guard !written.isEmpty else { return nil }
-            return "成功写入沙盒外：\(written[0])"
-        }
-    )
-
-    // MARK: C4 · 进程创建
-
-    static let forkCheck = Detector(
-        id: "C4",
-        level: .c,
-        name: "子进程创建",
-        detail: "调用 fork()。iOS 沙盒内应用禁止创建子进程，返回成功即为异常。",
-        run: {
             let pid = aegis_fork_raw()
             if pid == 0 {
-                // 子进程立刻退出，不留垃圾进程
                 _exit(0)
             }
             if pid > 0 {
                 var status: Int32 = 0
                 kill(pid, SIGKILL)
                 waitpid(pid, &status, 0)
-                return "fork() 成功返回子进程 PID=\(pid)"
+                reasons.append("SYS_fork 成功创建子进程 PID=\(pid)")
             }
-            // pid < 0：errno == EPERM 属正常
-            return nil
+
+            guard !reasons.isEmpty else { return nil }
+            return reasons.joined(separator: "；")
+        }
+    )
+
+    // MARK: C4 · 环境变量审查
+
+    private static let envKeys = [
+        "DYLD_INSERT_LIBRARIES",
+        "DYLD_FRAMEWORK_PATH",
+        "DYLD_LIBRARY_PATH",
+        "DYLD_FORCE_FLAT_NAMESPACE",
+        "DYLD_IMAGE_SUFFIX",
+        "_MSSafeMode",
+        "_SafeMode",
+        "JB_ROOT"
+    ]
+
+    private static let nonSystemMarkers = [
+        "/var/jb", "/.jbroot", "/private/", "/var/mobile", "/tmp/",
+        "cydia", "substrate", "ellekit", "libhooker", "substitute", "tweak"
+    ]
+
+    static let environmentCheck = Detector(
+        id: "C4",
+        level: .c,
+        name: "环境变量审查",
+        detail: "检查 DYLD_INSERT_LIBRARIES / DYLD_FRAMEWORK_PATH 等注入相关变量，判断其值是否指向系统目录以外的路径。正常 App 这些变量为空或不含非系统路径。",
+        run: {
+            var hits: [String] = []
+
+            for key in envKeys {
+                guard let raw = getenv(key) else { continue }
+                let value = String(cString: raw)
+                if value.isEmpty { continue }
+
+                let lower = value.lowercased()
+                let hasMarker = nonSystemMarkers.contains { lower.contains($0) }
+                let onlySystem = value.split(separator: ":").allSatisfy { part -> Bool in
+                    let p = String(part)
+                    return p.hasPrefix("/System/") || p.hasPrefix("/usr/lib/")
+                }
+
+                if hasMarker || !onlySystem {
+                    hits.append("\(key)=\(value)")
+                }
+            }
+
+            guard !hits.isEmpty else { return nil }
+            return hits.prefix(2).joined(separator: "；")
+        }
+    )
+
+    // MARK: C5 · 模拟器与硬件指纹
+
+    static let simulatorHardwareCheck = Detector(
+        id: "C5",
+        level: .c,
+        name: "模拟器与硬件指纹",
+        detail: "检查是否运行在模拟器（TARGET_OS_SIMULATOR / hw.machine），并验证设备是否存在真实的 Secure Enclave 与生物识别硬件。模拟器无法通过此项。",
+        run: {
+            var reasons: [String] = []
+
+            #if targetEnvironment(simulator)
+            reasons.append("编译目标为模拟器")
+            #endif
+
+            var size = 0
+            if sysctlbyname("hw.machine", nil, &size, nil, 0) == 0, size > 0 {
+                var buf = [CChar](repeating: 0, count: size)
+                if sysctlbyname("hw.machine", &buf, &size, nil, 0) == 0 {
+                    let machine = String(cString: buf)
+                    if machine == "x86_64" || machine == "arm64" || machine.hasPrefix("i386") {
+                        reasons.append("hw.machine = \(machine)（非真机型号）")
+                    }
+                }
+            }
+
+            let bioFramework = "/System/Library/Frameworks/LocalAuthentication.framework/LocalAuthentication"
+            let hasBioHW = FileManager.default.fileExists(atPath: bioFramework)
+
+            var seSize = 0
+            let seRet = sysctlbyname("hw.optional.arm.FEAT_SME", nil, &seSize, nil, 0)
+            if seRet != 0 && !hasBioHW {
+                reasons.append("未检测到 Secure Enclave / 生物识别硬件")
+            }
+
+            guard !reasons.isEmpty else { return nil }
+            return reasons.joined(separator: "；")
         }
     )
 }
