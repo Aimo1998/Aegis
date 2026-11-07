@@ -1,5 +1,7 @@
 # Aegis
 
+[Click me to switch English.](README_EN.md)
+
 > 一个纯本地的 iOS 越狱环境检测 App —— 三级递进，17 项检测，覆盖从传统有根越狱到 RootHide 级别的高级隐藏。
 
 **全程离线运行，不联网、不上传任何数据。**
