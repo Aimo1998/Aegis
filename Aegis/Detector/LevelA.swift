@@ -189,37 +189,45 @@ enum LevelA {
         id: "A4",
         level: .a,
         name: "计时攻击检测",
-        detail: "用 mach_absolute_time 对 stat 类调用连续采样，对比「正常系统路径」与「越狱特征路径」的单次耗时，并对比纯 syscall（getpid）基线。被 Hook 拦截的路径耗时会明显偏离正常区间。",
+        detail: "用 mach_absolute_time 对 lstat 连续采样，对比「正常系统路径」「越狱特征路径」「不存在的路径」三者的单次耗时。只做同类操作对比——被 Hook 拦截的路径会明显偏慢（>6x）或异常偏快（<0.1x）。",
         run: {
-            let iterations = 300
+            let iterations = 400
             var st = Darwin.stat()
 
+            // 三条路径取各自的平均耗时
             let normalNs = measureNs(iterations: iterations) {
                 _ = lstat("/System/Library", &st)
             }
             let jailNs = measureNs(iterations: iterations) {
                 _ = lstat("/var/jb", &st)
             }
-            let sysNs = measureNs(iterations: iterations) {
-                _ = getpid()
+            let missingNs = measureNs(iterations: iterations) {
+                _ = lstat("/.aegis_nonexistent_probe", &st)
             }
 
             var issues: [String] = []
 
-            if normalNs > 0 && sysNs > 0 {
-                let ratio = normalNs / sysNs
-                if ratio > 30 {
-                    issues.append(String(format: "正常路径 lstat 耗时异常 (%.1fx syscall)", ratio))
+            // 只做「同类操作之间」的对比：lstat 与 lstat 比，
+            // 不能拿 lstat 去比 getpid —— 两者差 4 个数量级属正常。
+            if normalNs > 0 && jailNs > 0 {
+                let ratio = jailNs / normalNs
+                if ratio > 6.0 {
+                    issues.append(String(format:
+                        "/var/jb 探测耗时 %.1fx 于正常路径（疑似 Hook 拦截）", ratio))
+                }
+                if ratio < 0.10 {
+                    issues.append(String(format:
+                        "/var/jb 探测耗时仅 %.2fx（疑似伪造返回）", ratio))
                 }
             }
 
-            if normalNs > 0 && jailNs > 0 {
-                let ratio = jailNs / normalNs
-                if ratio > 4.0 {
-                    issues.append(String(format: "/var/jb 探测耗时 %.1fx 于正常路径（疑似 Hook 拦截）", ratio))
-                }
-                if ratio < 0.15 {
-                    issues.append(String(format: "/var/jb 探测耗时仅 %.2fx（疑似伪造返回）", ratio))
+            // /var/jb 若不存在，耗时应接近「不存在的路径」；
+            // 若明显更快，说明没走真实 VFS 查找
+            if missingNs > 0 && jailNs > 0 && normalNs > 0 {
+                if jailNs < missingNs * 0.15 && jailNs < normalNs * 0.15 {
+                    issues.append(String(format:
+                        "/var/jb 探测比不存在的路径还快 %.0f%%（疑似伪造 ENOENT）",
+                        (1 - jailNs / missingNs) * 100))
                 }
             }
 
