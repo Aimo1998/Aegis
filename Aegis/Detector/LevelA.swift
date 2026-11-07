@@ -388,6 +388,7 @@ enum LevelA {
             let limit = min(count, 220)
 
             var mismatches: [String] = []
+            var resolved = 0
 
             for i in 0..<limit {
                 guard let cname = aegis_dyld_image_name(Int32(i)) else { continue }
@@ -400,12 +401,20 @@ enum LevelA {
                 guard dladdr(hdr, &info) != 0, let fname = info.dli_fname else { continue }
                 let dlPath = String(cString: fname)
                 guard !dlPath.isEmpty else { continue }
+                resolved += 1
 
                 if dyldPath != dlPath {
                     let short = (dyldPath as NSString).lastPathComponent
                     mismatches.append("\(short): dyld=\(dyldPath) dladdr=\(dlPath)")
                     if mismatches.count >= 3 { break }
                 }
+            }
+
+            // 解析率自检：dladdr 对 header 地址本应全部成功。
+            // 如果大部分失败，说明这条检测已被干扰，结果不可信 —— 直接报出来，
+            // 免得"全部跳过"被误读成"全部一致"。
+            if resolved < max(10, limit / 4) {
+                return "dladdr 仅能解析 \(resolved)/\(limit) 个映像（检测受干扰，结论不可信）"
             }
 
             guard !mismatches.isEmpty else { return nil }

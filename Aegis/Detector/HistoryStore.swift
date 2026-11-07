@@ -178,8 +178,8 @@ extension DetectorCatalog {
             bypass: "符号链接可由 RootHide 换成 firmlink 或直接不落盘，lstat 只会看到普通目录"),
         "B8": DetectorMeta(weight: 15,
             bypass: "把 EACCES/EPERM 统一改写为 ENOENT，需要 Hook 沙盒判定，成本高"),
-        "B9": DetectorMeta(weight: 6,
-            bypass: "声明缺失是本机配置问题，无法通过修改环境绕过，只能补全 Info.plist"),
+        "B9": DetectorMeta(weight: 1,
+            bypass: "声明缺失是本机配置问题，不是越狱证据；权重降到 1，仅作提示"),
 
         "A7": DetectorMeta(weight: 20,
             bypass: "挂载表由内核维护，用户态只能隐藏条目，无法伪造 flags"),

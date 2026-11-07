@@ -173,12 +173,19 @@ enum LevelB {
                 let lower = path.lowercased()
 
                 // IMP 落在越狱路径 = 被注入库劫持
+                // 只认明确的越狱库路径与库名。
+                // 早先这里还有 lower.contains("tweak")，太宽 —— 正常库名里
+                // 出现 tweak 就会误判，已移除。
                 let suspect = lower.contains("/var/jb")
                     || lower.contains("/.jbroot")
-                    || lower.contains("/private/var")
-                    || lower.contains("substrate")
-                    || lower.contains("ellekit")
-                    || lower.contains("tweak")
+                    || lower.contains("/library/mobilesubstrate")
+                    || lower.contains("libsubstrate")
+                    || lower.contains("libsubstitute")
+                    || lower.contains("libhooker")
+                    || lower.contains("libellekit")
+                    || lower.contains("substrate.dylib")
+                    || lower.contains("0hbidhook")
+                    || lower.contains("tweakloader")
 
                 if suspect {
                     hits.append("\(className) -\(selectorName) → \(path)")
@@ -198,7 +205,7 @@ enum LevelB {
         id: "B4",
         level: .b,
         name: "调试与反注入",
-        detail: "检查 sysctl P_TRACED 标志、ptrace(PT_DENY_ATTACH) 返回值，并探测 Frida 默认端口 27042/27043/27044 及 gum 符号。",
+        detail: "检查 sysctl P_TRACED 标志、ptrace(PT_DENY_ATTACH) 的返回值，并查找 Frida 注入留下的 gum_* 符号。端口扫描已移至 B12，避免同一特征被重复计分。",
         run: {
             var reasons: [String] = []
 
@@ -223,10 +230,7 @@ enum LevelB {
                 reasons.append("PT_DENY_ATTACH 返回值异常")
             }
 
-            // 3) Frida 端口
-            for port in fridaPorts where aegis_port_open(port, 200) {
-                reasons.append("端口 \(port) 开放")
-            }
+            // 端口扫描已移到 B12（本地服务端口），这里不再重复检测
 
             // 4) Frida 符号
             for s in ["gum_init", "frida_agent_main", "gum_script_backend"] {
