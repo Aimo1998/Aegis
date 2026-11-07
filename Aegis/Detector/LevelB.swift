@@ -151,7 +151,12 @@ enum LevelB {
                 let imp = method_getImplementation(method)
                 var info = Dl_info()
                 let ptr = unsafeBitCast(imp, to: UnsafeRawPointer.self)
-                guard dladdr(ptr, &info) != 0, let fname = info.dli_fname else { continue }
+
+                // dladdr 失败 = IMP 不归属任何已加载映像（动态生成的 block / 内存中注入的代码）
+                guard dladdr(ptr, &info) != 0, let fname = info.dli_fname else {
+                    hits.append("\(className) -\(selectorName) → IMP 不归属任何映像")
+                    continue
+                }
 
                 let path = String(cString: fname)
                 let lower = path.lowercased()

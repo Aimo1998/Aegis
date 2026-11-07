@@ -71,6 +71,8 @@ final class ScanEngine: ObservableObject {
                 self.isScanning = false
                 self.progress = 1
                 self.currentCheck = ""
+                // 写入历史，供「历史记录」页做变化对比
+                HistoryStore.shared.add(finalReport)
             }
         }
     }
