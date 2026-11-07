@@ -298,31 +298,7 @@ enum LevelB {
             return "发现 \(hits.count) 个可疑进程：" + hits.prefix(4).joined(separator: "、")
         }
     )
-}
 
-// MARK: - 辅助
-
-/// 通过 C shim 取挂载点
-func aegisFetchMounts() -> [String]? {
-    var buf = [CChar](repeating: 0, count: 32768)
-    let n = buf.withUnsafeMutableBufferPointer { p -> Int32 in
-        aegis_mount_points(p.baseAddress, size_t(32768))
-    }
-    guard n > 0 else { return nil }
-    let raw = String(cString: buf)
-    return raw.split(separator: "\n").map(String.init)
-}
-
-/// 通过 C shim 取进程名列表
-func aegisFetchProcesses() -> [String]? {
-    var buf = [CChar](repeating: 0, count: 65536)
-    let n = buf.withUnsafeMutableBufferPointer { p -> Int32 in
-        aegis_list_process_names(p.baseAddress, size_t(65536))
-    }
-    guard n > 0 else { return nil }
-    let raw = String(cString: buf)
-    let list = raw.split(separator: "\n").map(String.init)
-    return list.isEmpty ? nil : list
     // MARK: B7 · 符号链接本体
 
     static let symlinkResidueCheck = Detector(
@@ -508,4 +484,29 @@ func aegisFetchProcesses() -> [String]? {
         }
     )
 
+}
+
+// MARK: - 辅助
+
+/// 通过 C shim 取挂载点
+func aegisFetchMounts() -> [String]? {
+    var buf = [CChar](repeating: 0, count: 32768)
+    let n = buf.withUnsafeMutableBufferPointer { p -> Int32 in
+        aegis_mount_points(p.baseAddress, size_t(32768))
+    }
+    guard n > 0 else { return nil }
+    let raw = String(cString: buf)
+    return raw.split(separator: "\n").map(String.init)
+}
+
+/// 通过 C shim 取进程名列表
+func aegisFetchProcesses() -> [String]? {
+    var buf = [CChar](repeating: 0, count: 65536)
+    let n = buf.withUnsafeMutableBufferPointer { p -> Int32 in
+        aegis_list_process_names(p.baseAddress, size_t(65536))
+    }
+    guard n > 0 else { return nil }
+    let raw = String(cString: buf)
+    let list = raw.split(separator: "\n").map(String.init)
+    return list.isEmpty ? nil : list
 }
