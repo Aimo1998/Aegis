@@ -273,26 +273,6 @@ RootHide 一类方案能在返回值和文件属性上做手脚，但**无法同
 
 ---
 
-## 校准记录
-
-v1.2.0 在 iPhone X / iOS 16.7.8 / Dopamine rootless 上实测后修正的项：
-
-| 项 | 原问题 | 修法 |
-|---|---|---|
-| C5 | `hw.model` 在 iOS 上返回平台代号（D22AP），不是机型 | 改用 `hw.machine`，且只认明确的模拟器架构 |
-| C3 | `/tmp` 是沙盒内 tmp 的符号链接，写入必然成功 | 移除该探测目标 |
-| B7 | Dopamine 的 `/var/jb` 本就指向 `/private/preboot/...` | 排除指向 preboot 的链接 |
-| B10 | 沙盒内读不到 `/var/jb`，检查永远失败 | 改为读 `LC_ENCRYPTION_INFO_64` 的 cryptid |
-| B11 | 阈值 420 太严，越狱设备正常就有 500+ | 提到 700 |
-| B4 | 与 B12 重复扫描 Frida 端口，同一证据算两次分 | 端口归 B12，B4 只看调试标志 |
-| B9 | 配置问题被当越狱证据 | 权重 6 → 1 |
-| A4 | 拿 lstat 和 getpid 比耗时，25000 倍是正常值 | 改为三条 lstat 路径互比 |
-| A8 | dladdr 解析失败时整轮跳过，会被误读成"全部一致" | 加解析率自检，低于 25% 直接报 |
-| A11 | ldid 空签名没有 application-identifier，被当重签名 | 缺失不再判异常 |
-| A2 | ad-hoc 签名必然缺 CS_RESTRICT，被当越狱 | 只判内核强制的位 |
-
----
-
 ## 目录结构
 
 ```
@@ -310,8 +290,8 @@ Aegis/
     ├── Detector/
     │   ├── Models.swift             # 检测项模型 + 结果聚合 + 风险评分
     │   ├── LevelC.swift             # 🔵 5 项
-    │   ├── LevelB.swift             # 🟡 6 项
-    │   ├── LevelA.swift             # 🔴 6 项
+    │   ├── LevelB.swift             # 🟡 12 项
+    │   ├── LevelA.swift             # 🔴 11 项
     │   ├── ScanEngine.swift         # 扫描调度
     │   ├── DylibScanner.swift       # 已加载映像枚举与分类
     │   ├── HistoryStore.swift       # 历史记录 + 权重/绕过元数据
@@ -328,31 +308,6 @@ Aegis/
         ├── SystemInfoView.swift     # 系统信息诊断
         ├── CompareView.swift        # 两台设备报告对比
         └── SharedFooter.swift       # 全局署名
-```
-
----
-
-## 发布
-
-发行版命名固定为 **`Aegis v<版本号>`**（如 `Aegis v1.2.0`），tag 为 `v<版本号>`。
-
-一键发布：
-
-```bash
-export GH_TOKEN=<有 repo 权限的 PAT>
-./release.sh 1.2.0 build/Aegis.deb build/Aegis.ipa
-```
-
-脚本会自动：
-
-1. 创建 Release，名称为 `Aegis v1.2.0`，tag 为 `v1.2.0`
-2. 上传 `Aegis.deb` 与 `Aegis.ipa`
-3. 打印 release 页面地址
-
-如需自定义更新说明，第四个参数传一个 Markdown 文件：
-
-```bash
-./release.sh 1.2.0 build/Aegis.deb build/Aegis.ipa RELEASE_NOTES.md
 ```
 
 ---
