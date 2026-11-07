@@ -212,25 +212,44 @@ int aegis_list_process_names(char *out, size_t outSize) {
     out[0] = '\0';
 
     int mib[4] = {CTL_KERN, KERN_PROC, KERN_PROC_ALL, 0};
-    size_t len = 0;
-    if (sysctl(mib, 4, NULL, &len, NULL, 0) != 0 || len == 0) return 0;
 
-    struct kinfo_proc *procs = (struct kinfo_proc *)malloc(len);
+    // KERN_PROC_ALL 存在经典竞态：查完长度后进程表可能又变了，
+    // 第二次 sysctl 会返回 ENOMEM。这里预留 25% 余量并最多重试 3 次。
+    struct kinfo_proc *procs = NULL;
+    size_t len = 0;
+
+    for (int attempt = 0; attempt < 3; attempt++) {
+        size_t probe = 0;
+        if (sysctl(mib, 4, NULL, &probe, NULL, 0) != 0 || probe == 0) continue;
+
+        probe += probe / 4;           // 25% 余量
+        struct kinfo_proc *buf = (struct kinfo_proc *)malloc(probe);
+        if (!buf) continue;
+
+        len = probe;
+        if (sysctl(mib, 4, buf, &len, NULL, 0) == 0) {
+            procs = buf;
+            break;
+        }
+        free(buf);                    // 失败就放掉，下一轮重来
+    }
+
     if (!procs) return 0;
-    if (sysctl(mib, 4, procs, &len, NULL, 0) != 0) { free(procs); return 0; }
 
     int count = (int)(len / sizeof(struct kinfo_proc));
     size_t written = 0;
+
     for (int i = 0; i < count; i++) {
         const char *name = procs[i].kp_proc.p_comm;
+        if (name[0] == '\0') continue;
         size_t l = strlen(name);
-        if (l == 0) continue;
         if (written + l + 2 >= outSize) break;
         memcpy(out + written, name, l);
         written += l;
         out[written++] = '\n';
     }
     free(procs);
+
     out[written] = '\0';
     return (int)written;
 }
