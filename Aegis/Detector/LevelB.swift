@@ -23,7 +23,10 @@ enum LevelB {
         processChainCheck,
         symlinkResidueCheck,
         permissionProbeCheck,
-        schemeDeclareCheck
+        schemeDeclareCheck,
+        selfPathCheck,
+        dylibCountCheck,
+        portScanCheck
     ]
 
     // MARK: B1 · 无根越狱路径探测
@@ -422,6 +425,86 @@ func aegisFetchProcesses() -> [String]? {
             let missing = needed.filter { !declaredLower.contains($0) }
             guard !missing.isEmpty else { return nil }
             return "未声明：\(missing.joined(separator: ", "))（这些 Scheme 无法探测，C2 存在盲区）"
+        }
+    )
+
+    // MARK: B10 · 自身运行路径
+
+    static let selfPathCheck = Detector(
+        id: "B10",
+        level: .b,
+        name: "自身运行路径",
+        detail: "检查 App 自身的可执行文件是否从越狱目录（/var/jb、/private/preboot、/.jbroot）加载。装在沙盒容器外即说明以越狱方式部署。",
+        run: {
+            let exe = Bundle.main.executablePath ?? ""
+            guard !exe.isEmpty else { return nil }
+
+            let badMarkers = ["/var/jb/", "/.jbroot/", "/private/preboot/",
+                              "/Library/MobileSubstrate/"]
+            for m in badMarkers where exe.contains(m) {
+                return "App 从越狱路径运行：\(exe)"
+            }
+
+            // 正常应在 /var/containers/Bundle/Application/ 下
+            if !exe.contains("/var/containers/Bundle/Application/")
+                && !exe.contains("/private/var/containers/Bundle/Application/") {
+                return "App 位于非常规容器路径：\(exe)"
+            }
+            return nil
+        }
+    )
+
+    // MARK: B11 · 动态库数量基线
+
+    static let dylibCountCheck = Detector(
+        id: "B11",
+        level: .b,
+        name: "动态库数量基线",
+        detail: "统计当前进程加载的 dylib 总数。正常 iOS App 在 150~320 之间，明显偏多说明被批量注入，明显偏少说明环境被裁剪。",
+        run: {
+            let raw = aegis_dyld_image_count()
+            guard raw > 0 else { return nil }
+            let n = Int(raw)
+
+            if n > 420 {
+                return "加载 \(n) 个 dylib（正常上限约 320）"
+            }
+            if n < 90 {
+                return "仅加载 \(n) 个 dylib（异常偏少）"
+            }
+            return nil
+        }
+    )
+
+    // MARK: B12 · 本地端口扫描
+
+    static let portScanCheck = Detector(
+        id: "B12",
+        level: .b,
+        name: "本地服务端口",
+        detail: "扫描本机回环上的常见后门与调试端口：22(ssh)、1337、4444、8080、9090、31337、27042~27044(Frida)。任一开放即说明有调试服务在跑。",
+        run: {
+            let ports: [(Int32, String)] = [
+                (22, "ssh"),
+                (1337, "backdoor"),
+                (4444, "backdoor"),
+                (8080, "http-proxy"),
+                (9090, "panel"),
+                (31337, "backdoor"),
+                (27042, "frida"),
+                (27043, "frida"),
+                (27044, "frida")
+            ]
+
+            var open: [String] = []
+            for (port, label) in ports {
+                if aegis_port_open(port, 180) {
+                    open.append("\(port)/\(label)")
+                }
+            }
+
+            guard !open.isEmpty else { return nil }
+            return "开放端口：" + open.joined(separator: "、")
         }
     )
 

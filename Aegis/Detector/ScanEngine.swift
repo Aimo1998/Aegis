@@ -94,4 +94,44 @@ final class ScanEngine: ObservableObject {
         currentCheck = ""
         isScanning = false
     }
+    /// 全部检测项索引（单项重测用）
+    private var allDetectors: [Detector] {
+        LevelC.all + LevelB.all + LevelA.all
+    }
+
+    /// 单项重测：只重跑指定 ID 的检测，原地更新报告
+    func rerun(id: String, onUpdate: (() -> Void)? = nil) {
+        guard let old = report else { return }
+        guard let detector = allDetectors.first(where: { $0.id == id }) else { return }
+        guard let idx = old.results.firstIndex(where: { $0.id == id }) else { return }
+
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let evidence = detector.run()
+
+            DispatchQueue.main.async {
+                guard let self = self, let cur = self.report else { return }
+                guard let i = cur.results.firstIndex(where: { $0.id == id }) else { return }
+
+                var results = cur.results
+                results[i] = CheckResult(
+                    id: detector.id,
+                    level: detector.level,
+                    name: detector.name,
+                    detail: detector.detail,
+                    triggered: (evidence != nil),
+                    evidence: evidence
+                )
+
+                let updated = ScanReport(
+                    level: cur.level,
+                    results: results,
+                    startedAt: cur.startedAt,
+                    duration: cur.duration
+                )
+                self.report = updated
+                onUpdate?()
+            }
+        }
+    }
+
 }

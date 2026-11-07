@@ -7,6 +7,7 @@
 
 import Foundation
 import Darwin
+import Security
 import DeviceCheck
 
 // Swift 无法使用 C 的 #define 数值宏，这里等价定义一份
@@ -31,7 +32,9 @@ enum LevelA {
         appAttestCheck,
         mountAnalysisCheck,
         imagePathConsistencyCheck,
-        csopsIntegrityCheck
+        csopsIntegrityCheck,
+        machoSelfCheck,
+        entitlementCheck
     ]
 
     // MARK: A1 · API 交叉验证
@@ -439,6 +442,107 @@ enum LevelA {
             }
 
             return nil
+        }
+    )
+
+    // MARK: A10 · Mach-O 自检
+
+    static let machoSelfCheck = Detector(
+        id: "A10",
+        level: .a,
+        name: "Mach-O 自检",
+        detail: "绕过 _dyld_* API，直接读取本进程主程序 header 的 load commands，解析 LC_LOAD_DYLIB 列表，并与 dyld 报告的映像数对比。dyld 层被 Hook 时两者会出现分歧。",
+        run: {
+            // 1. header 基本信息
+            var ncmds: UInt32 = 0
+            var sizeofcmds: UInt32 = 0
+            guard aegis_self_header_info(&ncmds, &sizeofcmds) else {
+                return "无法读取自身 Mach-O header（可能被 Hook）"
+            }
+
+            if ncmds == 0 || sizeofcmds == 0 {
+                return "Mach-O header 异常：ncmds=\(ncmds) sizeofcmds=\(sizeofcmds)"
+            }
+
+            // 2. 直接解析 LC_LOAD_DYLIB
+            var buf = [CChar](repeating: 0, count: 8192)
+            let n = buf.withUnsafeMutableBufferPointer { p -> Int32 in
+                aegis_self_load_dylibs(p.baseAddress, size_t(8192))
+            }
+            guard n > 0 else { return nil }
+
+            let raw = String(cString: buf)
+            let linked = raw.split(separator: "\n").map(String.init)
+            guard !linked.isEmpty else { return nil }
+
+            var issues: [String] = []
+
+            // 3. 链接列表里出现越狱路径
+            for lib in linked {
+                let l = lib.lowercased()
+                if l.contains("/var/jb/") || l.contains("/.jbroot/")
+                    || l.contains("substrate") || l.contains("substitute")
+                    || l.contains("libhooker") || l.contains("ellekit") {
+                    issues.append("链接了越狱库：\(lib)")
+                    if issues.count >= 3 { break }
+                }
+            }
+
+            // 4. 与 dyld 视图比对：主程序链接数应远小于全进程映像数
+            let total = Int(aegis_dyld_image_count())
+            if total > 0 && linked.count > total {
+                issues.append("链接库 \(linked.count) 个 > 进程映像 \(total) 个（约定被破坏）")
+            }
+
+            guard !issues.isEmpty else { return nil }
+            return issues.joined(separator: "；")
+        }
+    )
+
+    // MARK: A11 · Entitlements 校验
+
+    static let entitlementCheck = Detector(
+        id: "A11",
+        level: .a,
+        name: "Entitlements 校验",
+        detail: "用 SecTask 读取本进程的 entitlements，校验 application-identifier 是否为 TeamID.BundleID 格式、get-task-allow 状态、以及是否存在异常的自定义权限。重签名常在这里留下痕迹。",
+        run: {
+            guard let task = SecTaskCreateFromSelf(nil) else { return nil }
+
+            var issues: [String] = []
+
+            // application-identifier 必须是 TeamID.BundleID
+            let appIdKey = "application-identifier" as CFString
+            if let val = SecTaskCopyValueForEntitlement(task, appIdKey, nil) as? String {
+                let comps = val.split(separator: ".")
+                let bid = Bundle.main.bundleIdentifier ?? ""
+                if comps.count < 2 {
+                    issues.append("application-identifier 格式异常：\(val)")
+                } else if !bid.isEmpty && !val.hasSuffix(bid) {
+                    issues.append("application-identifier(\(val)) 与 BundleID(\(bid)) 不匹配")
+                }
+                // TeamID 一般是 10 位
+                if let team = comps.first, team.count != 10 {
+                    issues.append("TeamID 长度异常：\(team)")
+                }
+            } else {
+                issues.append("缺少 application-identifier（疑似重签名）")
+            }
+
+            // get-task-allow
+            let gtaKey = "get-task-allow" as CFString
+            if let gta = SecTaskCopyValueForEntitlement(task, gtaKey, nil) as? Bool, gta {
+                issues.append("get-task-allow=true（允许调试器附加）")
+            }
+
+            // 是否有平台签名标记（正常 App 不该有）
+            let platKey = "platform-application" as CFString
+            if let plat = SecTaskCopyValueForEntitlement(task, platKey, nil) as? Bool, plat {
+                issues.append("带 platform-application 权限（平台级伪造）")
+            }
+
+            guard !issues.isEmpty else { return nil }
+            return issues.prefix(3).joined(separator: "；")
         }
     )
 

@@ -188,6 +188,18 @@ extension DetectorCatalog {
         "A9": DetectorMeta(weight: 18,
             bypass: "csops 是私有 syscall，Hook 后极难保持多次调用完全一致"),
 
+        "B10": DetectorMeta(weight: 10,
+            bypass: "只能把 App 装回沙盒容器，越狱部署方式无法伪装"),
+        "B11": DetectorMeta(weight: 8,
+            bypass: "可卸载多余 tweak 把数量压回区间，但会牺牲功能"),
+        "B12": DetectorMeta(weight: 10,
+            bypass: "关掉 ssh / Frida / 面板服务即可，纯行为特征"),
+
+        "A10": DetectorMeta(weight: 24,
+            bypass: "需同时篡改 Mach-O load commands 与 dyld 视图，任一处不一致即暴露"),
+        "A11": DetectorMeta(weight: 22,
+            bypass: "entitlements 由内核签名绑定，重签名必然改变 application-identifier"),
+
         "A1": DetectorMeta(weight: 25,
             bypass: "必须同时 Hook libc 与裸 syscall 且结果完全一致，极易露馅"),
         "A2": DetectorMeta(weight: 20,

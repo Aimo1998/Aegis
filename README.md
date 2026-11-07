@@ -2,14 +2,14 @@
 
 [Click me to switch English.](README_EN.md)
 
-> 一个纯本地的 iOS 越狱环境检测 App —— 三级递进，23 项检测，覆盖从传统有根越狱到 RootHide 级别的高级隐藏。
+> 一个纯本地的 iOS 越狱环境检测 App —— 三级递进，28 项检测，覆盖从传统有根越狱到 RootHide 级别的高级隐藏。
 
 **全程离线运行，不联网、不上传任何数据。**
 
 ```
 🔵 C 级 · 基础特征          5 项
-🟡 B 级 · 现代无根与注入     9 项
-🔴 A 级 · 深度对抗与底层校验  9 项
+🟡 B 级 · 现代无根与注入     12 项
+🔴 A 级 · 深度对抗与底层校验  11 项
 ```
 
 ---
@@ -38,7 +38,7 @@
 | C4 | 环境变量审查 | `DYLD_INSERT_LIBRARIES` / `DYLD_FRAMEWORK_PATH` 等 8 个变量，判断是否含非系统路径 |
 | C5 | 模拟器与硬件指纹 | `TARGET_OS_SIMULATOR` + `hw.machine` + Secure Enclave / 生物识别硬件存在性 |
 
-### 🟡 B 级 · 现代无根与注入（9 项）
+### 🟡 B 级 · 现代无根与注入（12 项）
 
 | ID | 检测项 | 实现要点 |
 |---|---|---|
@@ -51,8 +51,11 @@
 | B7 | 符号链接残留 | `lstat`（不跟随）检查 `/var/jb`、`/.jbroot` 等是否为符号链接，并 `readlink` 读出目标 |
 | B8 | 权限异常探测 | 逐个路径取 `errno`，区分「不存在(ENOENT)」与「存在但被拒(EACCES/EPERM)」 |
 | B9 | Scheme 声明自检 | 检查 `LSApplicationQueriesSchemes` 是否覆盖 10 个越狱 Scheme，标出 C2 的盲区 |
+| B10 | 自身运行路径 | 检查可执行文件是否位于 `/var/jb`、`/private/preboot`、`/.jbroot` 下 |
+| B11 | 动态库数量基线 | 正常 150~320；>420 判批量注入，<90 判环境被裁剪 |
+| B12 | 本地服务端口 | 扫 22 / 1337 / 4444 / 8080 / 9090 / 31337 / 27042-27044 |
 
-### 🔴 A 级 · 深度对抗与底层校验（9 项）
+### 🔴 A 级 · 深度对抗与底层校验（11 项）
 
 | ID | 检测项 | 实现要点 |
 |---|---|---|
@@ -65,6 +68,8 @@
 | A7 | 挂载点深度分析 | `getfsstat` + `statfs` 检查根文件系统可写性、`/System/Library` 挂载 flags、挂载点总数异常 |
 | A8 | 映像路径一致性 | 同一映像分别用 `_dyld_get_image_name` 与 `dladdr` 解析，比对路径是否分歧 |
 | A9 | csops 完整性 | 连调 3 次 `csops(CS_OPS_STATUS)`，返回值不稳定即判 Hook；`CS_VALID` 必须置位 |
+| A10 | Mach-O 自检 | 绕过 `_dyld_*`，直接解析主程序 load commands 的 `LC_LOAD_DYLIB`，与 dyld 视图交叉比对 |
+| A11 | Entitlements 校验 | `SecTask` 读 `application-identifier` / `get-task-allow` / `platform-application` |
 
 ---
 
@@ -108,7 +113,7 @@ uicache -p /var/jb/Applications/Aegis.app
 
 ## 风险评分
 
-23 项检测各有权重（合计 **336 分**），命中项权重按比例换算成 0–100 的风险分：
+28 项检测各有权重（合计 **410 分**），命中项权重按比例换算成 0–100 的风险分：
 
 | 分数 | 等级 | 含义 |
 |---|---|---|
@@ -129,6 +134,9 @@ uicache -p /var/jb/Applications/Aegis.app
 | — | — | B7 | 12 | A7 | 20 |
 | — | — | B8 | 15 | A8 | 22 |
 | — | — | B9 | 6 | A9 | 18 |
+| — | — | B10 | 10 | A10 | 24 |
+| — | — | B11 | 8 | A11 | 22 |
+| — | — | B12 | 10 | — | — |
 
 > 判定仍沿用「任一命中即 😢」，评分只用于表达严重程度。若要按分数阈值判定，改 `ScanReport.isJailbroken` 即可。
 
@@ -160,6 +168,7 @@ uicache -p /var/jb/Applications/Aegis.app
 | 🕒 **历史** | 每次扫描自动存档（最多 60 条），可对比上一条同等级记录，标出新增失败 / 已恢复项 |
 | 🧪 **红队自测** | 主动替换自身 IMP 验证 B3 灵敏度；统计注入库可见性 |
 | 🧾 **系统信息** | 底层返回值诊断：sysctl、csflags 位解析、lstat 与裸 syscall 对比、挂载表、进程表 |
+| 📊 **对比** | 粘贴两台设备的报告，逐项对比出各自独有的失败项 |
 
 ---
 

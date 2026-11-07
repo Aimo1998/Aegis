@@ -97,6 +97,11 @@ struct CheckResult: Identifiable {
 
     var passed: Bool { !triggered }
 
+    /// 按当前语言显示的名称
+    var localizedName: String {
+        L10n.shared.detectorName(id: id, fallback: name)
+    }
+
     /// 该项权重
     var weight: Int { DetectorCatalog.weight(for: id) }
 

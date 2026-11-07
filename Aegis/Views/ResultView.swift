@@ -11,6 +11,11 @@ struct ResultView: View {
 
     let report: ScanReport
     let onRescan: () -> Void
+    @ObservedObject var engine: ScanEngine
+    @ObservedObject private var l10n = L10n.shared
+
+    @State private var showShare = false
+    @State private var shareText = ""
 
     var body: some View {
         ScrollView {
@@ -23,11 +28,14 @@ struct ResultView: View {
                     ForEach(groupedResults, id: \.level) { group in
                         sectionHeader(group.level)
                         ForEach(group.items) { item in
-                            CheckRow(result: item)
+                            CheckRow(result: item) {
+                                engine.rerun(id: item.id)
+                            }
                         }
                     }
                 }
 
+                actionRow
                 rescanButton
                 footer
                 MadeByFooter()
@@ -190,6 +198,52 @@ struct ResultView: View {
 
     // MARK: 底部
 
+    // MARK: 导出操作
+
+    private var actionRow: some View {
+        HStack(spacing: 10) {
+            shareButton(icon: "doc.text", title: "完整报告") {
+                shareText = report.exportText()
+                showShare = true
+            }
+            shareButton(icon: "curlybraces", title: "JSON") {
+                shareText = report.exportJSON()
+                showShare = true
+            }
+            shareButton(icon: "text.bubble", title: "摘要") {
+                shareText = report.exportSummary()
+                showShare = true
+            }
+        }
+        .sheet(isPresented: $showShare) {
+            ShareSheet(text: shareText)
+                .presentationDetents([.medium, .large])
+        }
+    }
+
+    private func shareButton(icon: String, title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .medium))
+                Text(title)
+                    .font(.system(size: 11.5, weight: .medium, design: .rounded))
+            }
+            .foregroundStyle(.white.opacity(0.75))
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.white.opacity(0.05))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(Color.white.opacity(0.07), lineWidth: 1)
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
     private var rescanButton: some View {
         Button(action: onRescan) {
             HStack(spacing: 9) {
@@ -228,7 +282,10 @@ struct ResultView: View {
 struct CheckRow: View {
 
     let result: CheckResult
+    var onRerun: (() -> Void)? = nil
+
     @State private var expanded: Bool = false
+    @State private var rerunning: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -243,7 +300,9 @@ struct CheckRow: View {
 
                     VStack(alignment: .leading, spacing: 3) {
                         // 用户指定格式：✅xxx检测通过 / ❌xxx检测未通过
-                        Text("\(result.name)检测\(result.passed ? "通过" : "未通过")")
+                        Text("\(result.localizedName) " + (result.passed
+                                  ? l10n.t("检测通过", "passed")
+                                  : l10n.t("检测未通过", "failed")))
                             .font(.system(size: 14.5, weight: .medium, design: .rounded))
                             .foregroundStyle(result.passed
                                              ? Color.white.opacity(0.88)
@@ -271,6 +330,33 @@ struct CheckRow: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+
+            if expanded, let rerun = onRerun {
+                Button {
+                    rerunning = true
+                    rerun()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                        rerunning = false
+                    }
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: rerunning ? "arrow.triangle.2.circlepath" : "arrow.clockwise")
+                            .font(.system(size: 11, weight: .semibold))
+                        Text(rerunning ? "重测中…" : "重测此项")
+                            .font(.system(size: 11.5, weight: .medium, design: .rounded))
+                    }
+                    .foregroundStyle(Color(red: 0.55, green: 0.78, blue: 1.0))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(
+                        Capsule().fill(Color(red: 0.55, green: 0.78, blue: 1.0).opacity(0.12))
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(rerunning)
+                .padding(.horizontal, 14)
+                .padding(.bottom, 6)
+            }
 
             if expanded {
                 VStack(alignment: .leading, spacing: 8) {

@@ -73,5 +73,10 @@ bool aegis_mount_flags(const char *path, uint32_t *outFlags);
 void *aegis_dyld_image_header(int index);
 int  aegis_mount_count(void);
 
+
+// ===== 自身 Mach-O =====
+int  aegis_self_load_dylibs(char *out, size_t outSize);
+bool aegis_self_header_info(uint32_t *outNcmds, uint32_t *outSizeofcmds);
+
 #endif /* AegisShim_h */
 

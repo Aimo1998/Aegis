@@ -294,3 +294,52 @@ int aegis_mount_count(void) {
     int n = getfsstat(NULL, 0, MNT_NOWAIT);
     return n > 0 ? n : 0;
 }
+
+
+// ===== 自身 Mach-O 分析 =====
+
+/// 遍历主程序（image 0）的 load commands，把 LC_LOAD_DYLIB 的路径写入 out（换行分隔）
+int aegis_self_load_dylibs(char *out, size_t outSize) {
+    if (!out || outSize == 0) return 0;
+    out[0] = '\0';
+
+    const struct mach_header_64 *hdr =
+        (const struct mach_header_64 *)_dyld_get_image_header(0);
+    if (!hdr || hdr->magic != MH_MAGIC_64) return 0;
+
+    const uint8_t *p = (const uint8_t *)(hdr + 1);
+    const uint8_t *limit = p + hdr->sizeofcmds;
+    size_t written = 0;
+    int n = 0;
+
+    for (uint32_t c = 0; c < hdr->ncmds; c++) {
+        if (p + sizeof(struct load_command) > limit) break;
+        const struct load_command *lc = (const struct load_command *)p;
+        if (lc->cmdsize < sizeof(struct load_command)) break;
+
+        if (lc->cmd == LC_LOAD_DYLIB || lc->cmd == LC_LOAD_WEAK_DYLIB) {
+            const struct dylib_command *dc = (const struct dylib_command *)lc;
+            const char *name = (const char *)lc + dc->dylib.name.offset;
+            size_t len = strnlen(name, lc->cmdsize);
+            if (len > 0 && written + len + 2 < outSize) {
+                memcpy(out + written, name, len);
+                written += len;
+                out[written++] = '\n';
+                n++;
+            }
+        }
+        p += lc->cmdsize;
+    }
+    out[written] = '\0';
+    return n;
+}
+
+/// 主程序 Mach-O 的 sizeofcmds 与 ncmds，用于和 dyld 视图对比
+bool aegis_self_header_info(uint32_t *outNcmds, uint32_t *outSizeofcmds) {
+    const struct mach_header_64 *hdr =
+        (const struct mach_header_64 *)_dyld_get_image_header(0);
+    if (!hdr || hdr->magic != MH_MAGIC_64) return false;
+    if (outNcmds) *outNcmds = hdr->ncmds;
+    if (outSizeofcmds) *outSizeofcmds = hdr->sizeofcmds;
+    return true;
+}

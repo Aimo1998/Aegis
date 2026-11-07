@@ -15,6 +15,7 @@ enum AppMode: String, CaseIterable, Identifiable {
     case history = "历史"
     case redteam = "红队自测"
     case sysinfo = "系统信息"
+    case compare = "对比"
 
     var id: String { rawValue }
 
@@ -25,6 +26,7 @@ enum AppMode: String, CaseIterable, Identifiable {
         case .history: return "clock.arrow.circlepath"
         case .redteam: return "testtube.2"
         case .sysinfo: return "info.circle"
+        case .compare: return "rectangle.split.2x1"
         }
     }
 
@@ -35,6 +37,7 @@ enum AppMode: String, CaseIterable, Identifiable {
         case .history: return "扫描记录与变化对比"
         case .redteam: return "验证检测器灵敏度"
         case .sysinfo: return "底层返回值诊断"
+        case .compare: return "两台设备报告对比"
         }
     }
 }
@@ -68,6 +71,7 @@ struct ContentView: View {
                 case .history: HistoryView()
                 case .redteam: RedTeamView()
                 case .sysinfo: SystemInfoView()
+                case .compare: CompareView()
                 }
             }
         }
@@ -196,12 +200,52 @@ struct ContentView: View {
                     .padding(.horizontal, 16)
                 }
 
+                langRow
                 githubRow
 
                 Spacer(minLength: 8)
                 }
             }
         }
+    }
+
+    // MARK: 语言切换
+
+    private var langRow: some View {
+        Button {
+            let next: L10n.Lang = L10n.shared.lang == .zh ? .en : .zh
+            L10n.shared.lang = next
+        } label: {
+            HStack(spacing: 13) {
+                Image(systemName: "globe")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.55))
+                    .frame(width: 26)
+
+                Text(L10n.shared.t("语言", "Language"))
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white)
+
+                Spacer()
+
+                Text(L10n.shared.lang.title)
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color(red: 0.45, green: 0.72, blue: 1.0))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    .fill(Color.white.opacity(0.035))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 13, style: .continuous)
+                            .stroke(Color.white.opacity(0.04), lineWidth: 1)
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 16)
+        .padding(.top, 4)
     }
 
     // MARK: GitHub 跳转
@@ -269,9 +313,9 @@ struct ContentView: View {
         if engine.isScanning {
             scanningView
         } else if let report = engine.report {
-            ResultView(report: report) {
+            ResultView(report: report, onRescan: {
                 engine.reset()
-            }
+            }, engine: engine)
         } else {
             homeView
         }
