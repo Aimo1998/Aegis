@@ -44,5 +44,3 @@ targets:
         OTHER_LDFLAGS:
           - "-framework"
           - "DeviceCheck"
-    info:
-      path: Aegis/Info.plist
