@@ -234,6 +234,31 @@ Aegis/
 
 ---
 
+## 发布
+
+发行版命名固定为 **`Aegis v<版本号>`**（如 `Aegis v1.2.0`），tag 为 `v<版本号>`。
+
+一键发布：
+
+```bash
+export GH_TOKEN=<有 repo 权限的 PAT>
+./release.sh 1.2.0 build/Aegis.deb build/Aegis.ipa
+```
+
+脚本会自动：
+
+1. 创建 Release，名称为 `Aegis v1.2.0`，tag 为 `v1.2.0`
+2. 上传 `Aegis.deb` 与 `Aegis.ipa`
+3. 打印 release 页面地址
+
+如需自定义更新说明，第四个参数传一个 Markdown 文件：
+
+```bash
+./release.sh 1.2.0 build/Aegis.deb build/Aegis.ipa RELEASE_NOTES.md
+```
+
+---
+
 ## 环境要求
 
 - iOS **16.0+**（`kerning` / `tracking` 等 SwiftUI API 需要 16+）
