@@ -65,6 +65,7 @@ struct ContentView: View {
     @State private var selectedLevel: DetectionLevel = .a
     @State private var mode: AppMode = .detect
     @State private var showMenu = false
+    @State private var showAdmin = false
     @State private var cascade = false
 
     private let bgTop = Color(red: 0.05, green: 0.06, blue: 0.10)
