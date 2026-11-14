@@ -130,7 +130,7 @@ enum LevelA {
 
             var issues: [String] = []
 
-            // 只把「内核本应强制、无法被用户态篡改」的位缺失当作异常。
+            // 只把「内核本应保证、无法被用户态篡改」的位缺失当作异常。
             // CS_RESTRICT / CS_PLATFORM / CS_INSTALLER 缺失在 ad-hoc 签名（ldid -S）下
             // 属正常现象，CS_DEBUGGED 也常见于开发者证书，均不作为失败依据。
             if (flags & CS_VALID) == 0 {

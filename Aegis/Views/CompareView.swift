@@ -16,7 +16,7 @@ struct CompareView: View {
     @State private var toastMsg: String?
 
     @ObservedObject private var l10n = L10n.shared
-    @ObservedObject private var admin = AdminStore.shared
+    @ObservedObject private var vault = PrefsVault.shared
 
     struct DiffResult {
         var onlyA: [(String, String)] = []      // A 失败、B 通过
@@ -39,7 +39,7 @@ struct CompareView: View {
 
                 Button {
                     hideKeyboard()
-                    if handleAdminCommand() { return }
+                    if handleVaultInput() { return }
                     diff = analyze()
                 } label: {
                     Text(l10n.t("开始对比", "Compare"))
@@ -63,8 +63,8 @@ struct CompareView: View {
                     resultSection(d)
                 }
 
-                if admin.enabled {
-                    adminToggles
+                if vault.active {
+                    vaultToggles
                 }
 
                 MadeByFooter()
@@ -94,41 +94,41 @@ struct CompareView: View {
                                         to: nil, from: nil, for: nil)
     }
 
-    // MARK: Admin 指令
+    // MARK: 校验输入
 
-    /// 两个输入框里填口令/密钥时走管理流程，不当作报告解析
-    private func handleAdminCommand() -> Bool {
+    /// 两个输入框里填校验值时走配置流程，不当作报告解析
+    private func handleVaultInput() -> Bool {
         let a = textA.trimmingCharacters(in: .whitespacesAndNewlines)
         let b = textB.trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard a.lowercased().contains("adminpassword") else { return false }
 
-        switch admin.verify(a, b) {
+        switch vault.evaluate(a, b) {
         case .entered, .exited:
             textA = ""; textB = ""
             diff = nil
             return true
         case .wrongKey, .invalid:
             textA = ""; textB = ""
-            toastMsg = L10n.shared.t("口令或密钥不正确", "Wrong passphrase or key")
+            toastMsg = L10n.shared.t("校验未通过", "Verification failed")
             return true
         }
     }
 
-    // MARK: 解锁后的检测项开关
+    // MARK: 启用后的检测项开关
 
-    private var adminToggles: some View {
+    private var vaultToggles: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 7) {
                 Image(systemName: "lock.open.fill")
                     .font(.system(size: 12))
                     .foregroundStyle(Color(red: 0.45, green: 0.9, blue: 0.6))
-                Text(l10n.t("检测项管理 · 已解锁", "Detectors · unlocked"))
+                Text(l10n.t("高级 · 已启用", "Advanced · enabled"))
                     .font(.system(size: 12.5, weight: .semibold, design: .rounded))
                     .foregroundStyle(.white.opacity(0.75))
                 Spacer()
                 Button {
-                    admin.disabledIDs = []
+                    vault.skipSet = []
                 } label: {
                     Text(l10n.t("全开", "All"))
                         .font(.system(size: 11, weight: .medium, design: .rounded))
@@ -141,8 +141,8 @@ struct CompareView: View {
                 DisclosureGroup {
                     ForEach(level.own) { d in
                         Toggle(isOn: Binding(
-                            get: { admin.isEnabled(d.id) },
-                            set: { admin.setEnabled(d.id, $0) }
+                            get: { vault.isActive(d.id) },
+                            set: { vault.setActive(d.id, $0) }
                         )) {
                             HStack(spacing: 6) {
                                 Text(d.id)
@@ -165,11 +165,11 @@ struct CompareView: View {
             }
 
             Button {
-                textA = AdminStore.exitToken
-                _ = admin.verify(textA, "")
+                textA = PrefsVault.exitToken
+                _ = vault.evaluate(textA, "")
                 textA = ""; textB = ""
             } label: {
-                Text(l10n.t("退出管理", "Exit admin"))
+                Text(l10n.t("关闭", "Close"))
                     .font(.system(size: 11.5, weight: .medium, design: .rounded))
                     .foregroundStyle(Color(red: 1.0, green: 0.6, blue: 0.55))
             }

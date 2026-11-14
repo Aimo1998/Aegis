@@ -30,10 +30,10 @@ final class ScanEngine: ObservableObject {
         report = nil
         currentCheck = ""
 
-        // Admin 模式下可单独禁用某些检测项
+        // 启用偏好后可单独略过某些检测项
         let allChecks = level.checks(cascade: cascade)
-        let checks = AdminStore.shared.enabled
-            ? allChecks.filter { AdminStore.shared.isEnabled($0.id) }
+        let checks = PrefsVault.shared.enabled
+            ? allChecks.filter { PrefsVault.shared.isEnabled($0.id) }
             : allChecks
 
         // 必须在后台线程跑：
@@ -55,8 +55,8 @@ final class ScanEngine: ObservableObject {
 
                 let evidence = detector.run()
 
-                // Admin「强制通过」：照常跑，但结果算通过，证据抹掉
-                let forced = AdminStore.shared.shouldForcePass(detector.id)
+                // 偏好「记为通过」：照常跑，但结果算通过，证据抹掉
+                let forced = PrefsVault.shared.shouldSoften(detector.id)
                 let result = CheckResult(
                     id: detector.id,
                     level: detector.level,

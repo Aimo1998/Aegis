@@ -61,11 +61,11 @@ struct ContentView: View {
 
     @StateObject private var engine = ScanEngine()
     @ObservedObject private var l10n = L10n.shared
-    @ObservedObject private var adminStore = AdminStore.shared
+    @ObservedObject private var vault = PrefsVault.shared
     @State private var selectedLevel: DetectionLevel = .a
     @State private var mode: AppMode = .detect
     @State private var showMenu = false
-    @State private var showAdmin = false
+    @State private var showVault = false
     @State private var cascade = false
 
     private let bgTop = Color(red: 0.05, green: 0.06, blue: 0.10)
@@ -98,12 +98,12 @@ struct ContentView: View {
                 .presentationDetents([.medium])
                 .presentationDragIndicator(.visible)
         }
-        .sheet(isPresented: $showAdmin) {
+        .sheet(isPresented: $showVault) {
             NavigationStack {
-                AdminPanel()
+                PrefsPanel()
                     .toolbar {
                         ToolbarItem(placement: .topBarTrailing) {
-                            Button(L10n.shared.t("完成", "Done")) { showAdmin = false }
+                            Button(L10n.shared.t("完成", "Done")) { showVault = false }
                         }
                     }
             }
@@ -228,8 +228,8 @@ struct ContentView: View {
                     .padding(.horizontal, 16)
                 }
 
-                if AdminStore.shared.enabled {
-                    adminRow
+                if PrefsVault.shared.enabled {
+                    vaultRow
                 }
                 langRow
                 githubRow
@@ -240,12 +240,12 @@ struct ContentView: View {
         }
     }
 
-    // MARK: 管理入口
+    // MARK: 偏好入口
 
-    private var adminRow: some View {
+    private var vaultRow: some View {
         Button {
             showMenu = false
-            showAdmin = true
+            showVault = true
         } label: {
             HStack(spacing: 13) {
                 Image(systemName: "lock.open.fill")
@@ -254,18 +254,18 @@ struct ContentView: View {
                     .frame(width: 26)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(L10n.shared.t("管理", "Admin"))
+                    Text(L10n.shared.t("高级", "Advanced"))
                         .font(.system(size: 15, weight: .semibold, design: .rounded))
                         .foregroundStyle(.white)
-                    Text(L10n.shared.t("检测项开关 · 跳过 / 强制通过",
-                                           "Per-detector skip / force pass"))
+                    Text(L10n.shared.t("高级选项",
+                                           "Advanced options"))
                         .font(.system(size: 11, design: .rounded))
                         .foregroundStyle(.white.opacity(0.35))
                 }
 
                 Spacer()
 
-                Text("\(adminStore.skippedCount)/\(adminStore.forcedCount)")
+                Text("\(vault.skippedCount)/\(vault.forcedCount)")
                     .font(.system(size: 10.5, design: .monospaced))
                     .foregroundStyle(.white.opacity(0.3))
             }

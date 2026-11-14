@@ -1,23 +1,23 @@
 //
-//  AdminPanel.swift
+//  PrefsPanel.swift
 //  Aegis
 //
-//  管理面板：从菜单进入，仅 admin 解锁后可见
-//  每一项三态循环：正常 → 跳过 → 强制通过 → 正常
+//  偏好面板：从菜单进入，需校验后可见
+//  每一项三态循环：正常 → 略过 → 记为通过 → 正常
 //
 
 import SwiftUI
 import UIKit
 
-enum AdminCheckState {
+enum PrefsState {
     case normal        // 正常运行
     case skipped       // 跳过（不计入）
-    case forced        // 照常运行但强制显示通过
+    case forced        // 照常运行但记为通过
 }
 
-struct AdminPanel: View {
+struct PrefsPanel: View {
 
-    @ObservedObject private var admin = AdminStore.shared
+    @ObservedObject private var vault = PrefsVault.shared
     @ObservedObject private var l10n = L10n.shared
     @Environment(\.dismiss) private var dismiss
 
@@ -38,7 +38,7 @@ struct AdminPanel: View {
             .padding(.bottom, 40)
         }
         .background(Color(red: 0.05, green: 0.06, blue: 0.10).ignoresSafeArea())
-        .navigationTitle(l10n.t("管理", "Admin"))
+        .navigationTitle(l10n.t("高级", "Advanced"))
         .navigationBarTitleDisplayMode(.inline)
         .overlay(alignment: .top) {
             if let t = toast {
@@ -54,13 +54,13 @@ struct AdminPanel: View {
 
     private var summary: some View {
         HStack(spacing: 0) {
-            cell("\(admin.skippedCount)", l10n.t("跳过", "Skipped"),
+            cell("\(vault.skipCount)", l10n.t("略过", "Skipped"),
                  Color(red: 1.0, green: 0.72, blue: 0.45))
             Rectangle().fill(Color.white.opacity(0.08)).frame(width: 1, height: 26)
-            cell("\(admin.forcedCount)", l10n.t("强制通过", "Forced"),
+            cell("\(vault.softCount)", l10n.t("记为通过", "Softened"),
                  Color(red: 0.45, green: 0.9, blue: 0.6))
             Rectangle().fill(Color.white.opacity(0.08)).frame(width: 1, height: 26)
-            cell("\(34 - admin.skippedCount)", l10n.t("实际运行", "Running"),
+            cell("\(34 - vault.skipCount)", l10n.t("实际运行", "Running"),
                  .white.opacity(0.75))
         }
         .padding(.vertical, 14)
@@ -146,10 +146,10 @@ struct AdminPanel: View {
     private var actions: some View {
         VStack(spacing: 8) {
             Button {
-                admin.resetAll()
-                toast = l10n.t("已全部恢复", "All reset")
+                vault.clearAll()
+                toast = l10n.t("已还原", "All reset")
             } label: {
-                actionLabel(l10n.t("全部恢复正常", "Reset all"),
+                actionLabel(l10n.t("全部还原", "Reset all"),
                             Color(red: 0.55, green: 0.82, blue: 1.0))
             }
             .buttonStyle(.plain)
@@ -157,19 +157,19 @@ struct AdminPanel: View {
             Button {
                 var all: [String] = []
                 for level in DetectionLevel.allCases { all += level.own.map(\.id) }
-                admin.forceAll(all)
-                toast = l10n.t("全部强制通过", "All forced")
+                vault.softAll(all)
+                toast = l10n.t("全部记为通过", "All forced")
             } label: {
-                actionLabel(l10n.t("全部强制通过", "Force all"),
+                actionLabel(l10n.t("全部记为通过", "Soften all"),
                             Color(red: 0.45, green: 0.9, blue: 0.6))
             }
             .buttonStyle(.plain)
 
             Button {
-                UIPasteboard.general.string = admin.configSummary()
+                UIPasteboard.general.string = vault.snapshot()
                 toast = l10n.t("配置已复制", "Config copied")
             } label: {
-                actionLabel(l10n.t("复制当前配置", "Copy config"),
+                actionLabel(l10n.t("复制当前状态", "Copy state"),
                             .white.opacity(0.6))
             }
             .buttonStyle(.plain)
@@ -190,25 +190,25 @@ struct AdminPanel: View {
 
     // MARK: 状态
 
-    private func stateOf(_ id: String) -> AdminCheckState {
-        if !admin.isEnabled(id) { return .skipped }
-        if admin.isForced(id) { return .forced }
+    private func stateOf(_ id: String) -> PrefsState {
+        if !vault.isActive(id) { return .skipped }
+        if vault.isSoft(id) { return .forced }
         return .normal
     }
 
     private func cycle(_ id: String) {
         switch stateOf(id) {
         case .normal:
-            admin.setEnabled(id, false)
+            vault.setActive(id, false)
         case .skipped:
-            admin.setEnabled(id, true)
-            admin.setForced(id, true)
+            vault.setActive(id, true)
+            vault.setSoft(id, true)
         case .forced:
-            admin.setForced(id, false)
+            vault.setSoft(id, false)
         }
     }
 
-    private func icon(_ s: AdminCheckState) -> String {
+    private func icon(_ s: PrefsState) -> String {
         switch s {
         case .normal:  return "✅"
         case .skipped: return "⏭"
@@ -216,15 +216,15 @@ struct AdminPanel: View {
         }
     }
 
-    private func label(_ s: AdminCheckState) -> String {
+    private func label(_ s: PrefsState) -> String {
         switch s {
         case .normal:  return l10n.t("正常", "on")
-        case .skipped: return l10n.t("跳过", "skip")
-        case .forced:  return l10n.t("强制通过", "force")
+        case .skipped: return l10n.t("略过", "skip")
+        case .forced:  return l10n.t("记为通过", "force")
         }
     }
 
-    private func color(_ s: AdminCheckState) -> Color {
+    private func color(_ s: PrefsState) -> Color {
         switch s {
         case .normal:  return .white.opacity(0.7)
         case .skipped: return Color(red: 1.0, green: 0.72, blue: 0.45)

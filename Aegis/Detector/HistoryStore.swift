@@ -155,7 +155,7 @@ extension DetectorCatalog {
         "C2": DetectorMeta(weight: 6,
             bypass: "卸载越狱工具 App，对应 scheme 随之消失"),
         "C3": DetectorMeta(weight: 15,
-            bypass: "沙盒由内核强制，绕过需修改 sandbox profile，成本极高"),
+            bypass: "沙盒由内核保证，绕过需修改 sandbox profile，成本极高"),
         "C4": DetectorMeta(weight: 10,
             bypass: "启动时清空 DYLD_* 环境变量，或用 launchd 干净拉起"),
         "C5": DetectorMeta(weight: 5,
