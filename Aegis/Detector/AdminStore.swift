@@ -39,6 +39,35 @@ final class AdminStore: ObservableObject {
         }
     }
 
+
+    /// 逗号分隔的「强制通过」项 ID（照常运行，但结果强制显示为通过）
+    @AppStorage("aegis.admin.forced") private var forcedRaw: String = ""
+
+    var forcedIDs: Set<String> {
+        get {
+            Set(forcedRaw.split(separator: ",").map(String.init).filter { !$0.isEmpty })
+        }
+        set {
+            forcedRaw = newValue.sorted().joined(separator: ",")
+            objectWillChange.send()
+        }
+    }
+
+    func isForced(_ id: String) -> Bool {
+        forcedIDs.contains(id)
+    }
+
+    func setForced(_ id: String, _ on: Bool) {
+        var s = forcedIDs
+        if on { s.insert(id) } else { s.remove(id) }
+        forcedIDs = s
+    }
+
+    /// 该 ID 是否处于「强制通过」状态（且 admin 已解锁）
+    func shouldForcePass(_ id: String) -> Bool {
+        enabled && forcedIDs.contains(id)
+    }
+
     /// 该检测项是否启用
     func isEnabled(_ id: String) -> Bool {
         !disabledIDs.contains(id)
@@ -48,6 +77,35 @@ final class AdminStore: ObservableObject {
         var s = disabledIDs
         if on { s.remove(id) } else { s.insert(id) }
         disabledIDs = s
+    }
+
+
+    // MARK: 统计
+
+    var skippedCount: Int { disabledIDs.count }
+    var forcedCount: Int { forcedIDs.count }
+
+    func resetAll() {
+        disabledIDs = []
+        forcedIDs = []
+    }
+
+    /// 全部强制通过
+    func forceAll(_ ids: [String]) {
+        forcedIDs = Set(ids)
+    }
+
+    /// 当前配置的可读摘要（用于复制）
+    func configSummary() -> String {
+        var out: [String] = []
+        out.append("admin=\(enabled)")
+        if !disabledIDs.isEmpty {
+            out.append("skipped=" + disabledIDs.sorted().joined(separator: ","))
+        }
+        if !forcedIDs.isEmpty {
+            out.append("forced=" + forcedIDs.sorted().joined(separator: ","))
+        }
+        return out.joined(separator: "\n")
     }
 
     enum VerifyResult {
@@ -65,6 +123,7 @@ final class AdminStore: ObservableObject {
         if a.hasPrefix("No") || a == AdminStore.exitToken {
             enabled = false
             disabledRaw = ""
+            forcedRaw = ""
             return .exited
         }
 

@@ -61,6 +61,7 @@ struct ContentView: View {
 
     @StateObject private var engine = ScanEngine()
     @ObservedObject private var l10n = L10n.shared
+    @ObservedObject private var adminStore = AdminStore.shared
     @State private var selectedLevel: DetectionLevel = .a
     @State private var mode: AppMode = .detect
     @State private var showMenu = false
@@ -95,6 +96,16 @@ struct ContentView: View {
             menuSheet
                 .presentationDetents([.medium])
                 .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showAdmin) {
+            NavigationStack {
+                AdminPanel()
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button(L10n.shared.t("完成", "Done")) { showAdmin = false }
+                        }
+                    }
+            }
         }
         .animation(.easeInOut(duration: 0.22), value: engine.isScanning)
         .animation(.easeInOut(duration: 0.22), value: engine.report == nil)
@@ -216,6 +227,9 @@ struct ContentView: View {
                     .padding(.horizontal, 16)
                 }
 
+                if AdminStore.shared.enabled {
+                    adminRow
+                }
                 langRow
                 githubRow
 
@@ -223,6 +237,52 @@ struct ContentView: View {
                 }
             }
         }
+    }
+
+    // MARK: 管理入口
+
+    private var adminRow: some View {
+        Button {
+            showMenu = false
+            showAdmin = true
+        } label: {
+            HStack(spacing: 13) {
+                Image(systemName: "lock.open.fill")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(Color(red: 0.45, green: 0.9, blue: 0.6))
+                    .frame(width: 26)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(L10n.shared.t("管理", "Admin"))
+                        .font(.system(size: 15, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white)
+                    Text(L10n.shared.t("检测项开关 · 跳过 / 强制通过",
+                                           "Per-detector skip / force pass"))
+                        .font(.system(size: 11, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.35))
+                }
+
+                Spacer()
+
+                Text("\(adminStore.skippedCount)/\(adminStore.forcedCount)")
+                    .font(.system(size: 10.5, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.3))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    .fill(Color(red: 0.45, green: 0.9, blue: 0.6).opacity(0.08))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 13, style: .continuous)
+                            .stroke(Color(red: 0.45, green: 0.9, blue: 0.6).opacity(0.3),
+                                    lineWidth: 1)
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 16)
+        .padding(.top, 4)
     }
 
     // MARK: 语言切换

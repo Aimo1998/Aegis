@@ -55,13 +55,15 @@ final class ScanEngine: ObservableObject {
 
                 let evidence = detector.run()
 
+                // Admin「强制通过」：照常跑，但结果算通过，证据抹掉
+                let forced = AdminStore.shared.shouldForcePass(detector.id)
                 let result = CheckResult(
                     id: detector.id,
                     level: detector.level,
                     name: detector.name,
                     detail: detector.detail,
-                    triggered: evidence != nil,
-                    evidence: evidence
+                    triggered: forced ? false : (evidence != nil),
+                    evidence: forced ? nil : evidence
                 )
                 results.append(result)
 
