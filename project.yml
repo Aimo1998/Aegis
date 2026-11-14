@@ -33,7 +33,7 @@ targets:
         HEADER_SEARCH_PATHS:
           - $(SRCROOT)/Aegis
         TARGETED_DEVICE_FAMILY: "1,2"
-        MARKETING_VERSION: "1.2.1"
+        MARKETING_VERSION: "1.2.2"
         CURRENT_PROJECT_VERSION: "1"
         GENERATE_INFOPLIST_FILE: NO
         # 未签名构建：CI 与本地自用都不需要证书
