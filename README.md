@@ -1,4 +1,4 @@
-# Aegis
+## Aegis
 
 [Click me to switch English.](README_EN.md)
 
@@ -337,4 +337,4 @@ Aegis/
 
 ## License
 
-该项目是根据麻省理工学院许可证授权的。有关详细信息，请参阅[LICENCE]（LICENCE）文件。
+该项目是根据麻省理工学院许可证授权的。有关详细信息，请参阅[LICENCE](LICENCE)文件。
