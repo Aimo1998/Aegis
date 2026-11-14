@@ -17,7 +17,8 @@ enum LevelC {
         urlSchemeCheck,
         sandboxEscapeCheck,
         environmentCheck,
-        simulatorHardwareCheck
+        simulatorHardwareCheck,
+        regionConsistencyCheck
     ]
 
     // MARK: C1 · 文件系统黑名单
@@ -275,6 +276,51 @@ enum LevelC {
 
             guard !reasons.isEmpty else { return nil }
             return reasons.joined(separator: "；")
+        }
+    )
+
+    // MARK: C6 · 区域与系统一致性
+
+    static let regionConsistencyCheck = Detector(
+        id: "C6",
+        level: .c,
+        name: "区域与系统一致性",
+        detail: "检查 NSLocale 的区域码是否合法、是否与系统语言冲突、以及时区是否与区域匹配。伪装地区时这三者常常对不上。",
+        run: {
+            var issues: [String] = []
+
+            let locale = Locale.current
+            let region = (locale.regionCode ?? "").uppercased()
+            let lang = (locale.languageCode ?? "").lowercased()
+
+            // 1. 区域码必须存在于 ISO 3166
+            let validRegions = Set(Locale.isoRegionCodes)
+            if region.isEmpty {
+                issues.append("区域码为空")
+            } else if region.count != 2 || !validRegions.contains(region) {
+                issues.append("区域码非法：\(region)")
+            }
+
+            // 2. 区域与语言的常见组合（明显矛盾的组合可疑）
+            let oddPairs: Set<String> = ["cn:en", "us:zh", "jp:zh", "kr:zh", "hk:en"]
+            if !region.isEmpty && !lang.isEmpty {
+                if oddPairs.contains("\(region.lowercased()):\(lang)") {
+                    issues.append("区域 \(region) 与语言 \(lang) 组合异常")
+                }
+            }
+
+            // 3. 时区与区域不一致（只在区域是常见地区时判断）
+            let tz = TimeZone.current.identifier
+            let tzMap: [String: String] = [
+                "CN": "Shanghai", "HK": "Hong_Kong", "TW": "Taipei",
+                "JP": "Tokyo", "KR": "Seoul", "SG": "Singapore"
+            ]
+            if let expect = tzMap[region], !tz.contains(expect) {
+                issues.append("区域 \(region) 但时区为 \(tz)")
+            }
+
+            guard !issues.isEmpty else { return nil }
+            return issues.prefix(3).joined(separator: "；")
         }
     )
 }

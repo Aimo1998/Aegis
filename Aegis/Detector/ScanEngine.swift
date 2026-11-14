@@ -30,7 +30,11 @@ final class ScanEngine: ObservableObject {
         report = nil
         currentCheck = ""
 
-        let checks = level.checks(cascade: cascade)
+        // Admin 模式下可单独禁用某些检测项
+        let allChecks = level.checks(cascade: cascade)
+        let checks = AdminStore.shared.enabled
+            ? allChecks.filter { AdminStore.shared.isEnabled($0.id) }
+            : allChecks
 
         // 必须在后台线程跑：
         //  - canOpenURL 内部要回主线程，如果在主线程调用会死锁

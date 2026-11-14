@@ -371,3 +371,45 @@ bool aegis_self_cryptid(uint32_t *outCryptid) {
     }
     return false;
 }
+
+
+// ===== 任意映像的 LC_LOAD_DYLIB =====
+
+/// 读取第 index 个已加载映像的 LC_LOAD_DYLIB，写入 out（换行分隔）
+int aegis_image_load_dylibs(int index, char *out, size_t outSize) {
+    if (!out || outSize == 0) return 0;
+    out[0] = '\0';
+
+    uint32_t count = _dyld_image_count();
+    if (index < 0 || (uint32_t)index >= count) return 0;
+
+    const struct mach_header_64 *hdr =
+        (const struct mach_header_64 *)_dyld_get_image_header((uint32_t)index);
+    if (!hdr || hdr->magic != MH_MAGIC_64) return 0;
+
+    const uint8_t *p = (const uint8_t *)(hdr + 1);
+    const uint8_t *limit = p + hdr->sizeofcmds;
+    size_t written = 0;
+    int n = 0;
+
+    for (uint32_t c = 0; c < hdr->ncmds; c++) {
+        if (p + sizeof(struct load_command) > limit) break;
+        const struct load_command *lc = (const struct load_command *)p;
+        if (lc->cmdsize < sizeof(struct load_command)) break;
+
+        if (lc->cmd == LC_LOAD_DYLIB || lc->cmd == LC_LOAD_WEAK_DYLIB) {
+            const struct dylib_command *dc = (const struct dylib_command *)lc;
+            const char *name = (const char *)lc + dc->dylib.name.offset;
+            size_t len = strnlen(name, lc->cmdsize);
+            if (len > 0 && written + len + 2 < outSize) {
+                memcpy(out + written, name, len);
+                written += len;
+                out[written++] = '\n';
+                n++;
+            }
+        }
+        p += lc->cmdsize;
+    }
+    out[written] = '\0';
+    return n;
+}

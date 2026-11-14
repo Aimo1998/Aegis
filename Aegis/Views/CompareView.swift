@@ -60,6 +60,8 @@ struct CompareView: View {
                     resultSection(d)
                 }
 
+                AdminSection()
+
                 MadeByFooter()
             }
             .padding(.horizontal, 16)

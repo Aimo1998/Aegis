@@ -26,7 +26,9 @@ enum LevelB {
         schemeDeclareCheck,
         selfPathCheck,
         dylibCountCheck,
-        portScanCheck
+        portScanCheck,
+        injectionMismatchCheck,
+        shieldTweakCheck
     ]
 
     // MARK: B1 · 无根越狱路径探测
@@ -488,6 +490,83 @@ enum LevelB {
         }
     )
 
+
+    // MARK: B13 · 注入过滤不一致性
+
+    static let injectionMismatchCheck = Detector(
+        id: "B13",
+        level: .b,
+        name: "注入过滤不一致性",
+        detail: "挂载表里存在 /var/jb 或 jbroot，但 dyld 的映像列表里找不到任何越狱框架。路径在、框架无，说明注入被白名单类工具拦掉了。",
+        run: {
+            guard let mounts = aegisFetchMounts() else { return nil }
+
+            let hasJBPath = mounts.contains { m in
+                let l = m.lowercased()
+                return l.contains("/var/jb") || l.contains("jbroot") || l.contains("procursus")
+            }
+            guard hasJBPath else { return nil }
+
+            let rawCount = aegis_dyld_image_count()
+            guard rawCount > 0 else { return nil }
+            let count = Int(rawCount)
+
+            var hasJBImage = false
+            for i in 0..<min(count, 400) {
+                guard let cname = aegis_dyld_image_name(Int32(i)) else { continue }
+                let l = String(cString: cname).lowercased()
+                if l.contains("/var/jb") || l.contains("ellekit")
+                    || l.contains("substrate") || l.contains("substitute")
+                    || l.contains("libhooker") {
+                    hasJBImage = true
+                    break
+                }
+            }
+
+            if !hasJBImage {
+                return "挂载表有 /var/jb，但 dyld 中无越狱框架（注入被过滤）"
+            }
+            return nil
+        }
+    )
+
+    // MARK: B14 · 屏蔽插件本体特征
+
+    static let shieldTweakCheck = Detector(
+        id: "B14",
+        level: .b,
+        name: "屏蔽插件特征",
+        detail: "在已加载的动态库里直接匹配已知的越狱伪装/反检测插件：noJailbreak、Shadow、Choicy、HBIDHook、Liberty、vnodebypass、A-Bypass、FlyJB 等。这些插件本身就是越狱证据。",
+        run: {
+            let signatures = [
+                "nojailbreak", "shadow.dylib", "choicy", "hbidhook",
+                "jailprotect", "liberty", "vnodebypass", "a-bypass",
+                "flyjb", "kernbypass", "hidejb", "jailbreakhide",
+                "unsub", "tweakrestrictor"
+            ]
+
+            let rawCount = aegis_dyld_image_count()
+            guard rawCount > 0 else { return nil }
+            let count = Int(rawCount)
+
+            var hits: [String] = []
+            for i in 0..<min(count, 500) {
+                guard let cname = aegis_dyld_image_name(Int32(i)) else { continue }
+                let path = String(cString: cname)
+                let lower = path.lowercased()
+
+                for sig in signatures where lower.contains(sig) {
+                    let short = (path as NSString).lastPathComponent
+                    if !hits.contains(short) { hits.append(short) }
+                    break
+                }
+                if hits.count >= 5 { break }
+            }
+
+            guard !hits.isEmpty else { return nil }
+            return "发现屏蔽插件：" + hits.prefix(4).joined(separator: "、")
+        }
+    )
 }
 
 // MARK: - 辅助

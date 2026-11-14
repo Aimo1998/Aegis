@@ -15,6 +15,7 @@ extension DetectorCatalog {
         "C3": "Attempts to write a probe file outside the sandbox and to fork a child process. Both should fail inside a normal iOS sandbox.",
         "C4": "Inspects DYLD_INSERT_LIBRARIES, DYLD_FRAMEWORK_PATH and 6 more injection-related variables, flagging any value pointing outside system directories.",
         "C5": "Detects the simulator via TARGET_OS_SIMULATOR and hw.machine, then verifies real biometric hardware through LocalAuthentication's biometryType.",
+        "C6": "Checks whether the NSLocale region code is valid, whether it conflicts with the system language, and whether the timezone matches the region. A spoofed region usually breaks one of the three.",
 
         "B1": "Probes /var/jb, /.jbroot and other rootless mount points with the raw SYS_lstat, then scans the getfsstat mount table for jbroot entries.",
         "B2": "Walks _dyld_image_count to enumerate every loaded dylib, matching ElleKit / MobileSubstrate / Substitute / libhooker / systemhook and 11 more signatures.",
@@ -28,6 +29,8 @@ extension DetectorCatalog {
         "B10": "Reads LC_ENCRYPTION_INFO_64 from its own Mach-O and checks cryptid. App Store binaries ship encrypted (1); self-signed or jailbreak-deployed ones are 0.",
         "B11": "Counts loaded dylibs. A normal iOS app loads 150~320; far more suggests bulk injection, far fewer suggests a trimmed environment.",
         "B12": "Scans loopback for common backdoor and debug ports: 22 (ssh), 1337, 4444, 8080, 9090, 31337, 27042~27044 (Frida).",
+        "B13": "Mount table still shows /var/jb but no jailbreak framework is loaded — injection was filtered by a whitelist tool such as Choicy.",
+        "B14": "Matches known jailbreak-hiding tweaks directly in the loaded image list: noJailbreak, Shadow, Choicy, HBIDHook, Liberty, vnodebypass, A-Bypass, FlyJB and more. The hiding tweak is itself proof of a jailbreak.",
 
         "A1": "Queries the same path through libc lstat and raw SYS_lstat, comparing return value, inode and file type, then cross-checks with FileManager. Disagreement exposes a hook.",
         "A2": "Reads csflags via csops(CS_OPS_STATUS) and checks whether CS_VALID was forced on, CS_DEBUGGED stripped, CS_HARD / CS_KILL removed, or CS_PLATFORM / CS_INSTALLER missing.",
@@ -39,7 +42,10 @@ extension DetectorCatalog {
         "A8": "For the same loaded image, resolves the path through both _dyld_get_image_name and dladdr and compares them. Frida and memory injection often make the two diverge.",
         "A9": "Calls csops(CS_OPS_STATUS) three times, comparing the returned csflags. Any variation between calls indicates a hooked csops; CS_VALID must also be set.",
         "A10": "Bypasses _dyld_* and parses the main executable's load commands directly, extracting LC_LOAD_DYLIB entries and cross-checking them against the dyld view.",
-        "A11": "Reads its own entitlements through SecTask and validates application-identifier, get-task-allow and platform-application. Resigning always leaves traces here."
+        "A11": "Reads its own entitlements through SecTask and validates application-identifier, get-task-allow and platform-application. Resigning always leaves traces here.",
+        "A12": "TweakInject exists on the mount table yet zero tweaks from it are loaded — a hard contradiction unless the mount table is handled too.",
+        "A13": "Computes the Shannon entropy of every mount path containing jb. RootHide-style schemes mount jbroot under a random name (e.g. /.jbroot-<hex>), which scores far higher than ordinary paths.",
+        "A14": "Parses LC_LOAD_DYLIB of every dylib under jailbreak paths, looking for leftover rootful prefixes like /Library/MobileSubstrate. Plugins converted by tools such as XinaA15 often keep them.",
     ]
 
     static let bypassEN: [String: String] = [
@@ -48,6 +54,7 @@ extension DetectorCatalog {
         "C3": "The sandbox is enforced by the kernel; bypassing it means editing the sandbox profile",
         "C4": "Clear DYLD_* at launch, or start the app from launchd with a clean environment",
         "C5": "A simulator cannot fake Secure Enclave; real devices pass this by default",
+        "C6": "Region, language and timezone must all be faked consistently; changing one exposes the other two",
 
         "B1": "RootHide uses a randomized mount point and hooks stat so it stays invisible",
         "B2": "In-memory-only injection (never touches disk) plus library renaming, at the cost of functionality",
@@ -61,6 +68,8 @@ extension DetectorCatalog {
         "B10": "cryptid is set by Apple at distribution time and cannot be forged locally",
         "B11": "Trim the tweak set to bring the count back into range",
         "B12": "Stop the ssh / Frida / panel services — a purely behavioral signature",
+        "B13": "Hide the mount entry too (needs a mount namespace), or skip the filtering tool entirely",
+        "B14": "A hiding tweak must first load without a trace, which is harder than hiding the jailbreak itself",
 
         "A1": "Must hook both libc and the raw syscall identically, which is very easy to get wrong",
         "A2": "csflags is kernel-maintained; TrustCache needs a kernel patch",
@@ -72,6 +81,9 @@ extension DetectorCatalog {
         "A8": "Must hook both dyld and dladdr and return the same path from each",
         "A9": "csops is a private syscall; keeping several calls perfectly consistent after hooking is hard",
         "A10": "Would need to tamper with load commands and the dyld view at the same time",
-        "A11": "Entitlements are bound by the kernel signature; resigning always changes application-identifier"
+        "A11": "Entitlements are bound by the kernel signature; resigning always changes application-identifier",
+        "A12": "Both the directory and the loaded count must agree; unless the mount table is also handled",
+        "A13": "Randomized paths would need a fixed low-entropy prefix, which defeats the point of randomizing",
+        "A14": "Converted packages must rewrite every LC_LOAD_DYLIB entry, otherwise the old path is plainly visible",
     ]
 }

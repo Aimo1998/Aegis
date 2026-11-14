@@ -47,7 +47,10 @@ enum LevelA {
         imagePathConsistencyCheck,
         csopsIntegrityCheck,
         machoSelfCheck,
-        entitlementCheck
+        entitlementCheck,
+        pluginListIntegrityCheck,
+        roothideEntropyCheck,
+        rootfulResidueCheck
     ]
 
     // MARK: A1 · API 交叉验证
@@ -571,4 +574,133 @@ enum LevelA {
         }
     )
 
+
+    // MARK: A12 · 插件列表完整性
+
+    static let pluginListIntegrityCheck = Detector(
+        id: "A12",
+        level: .a,
+        name: "插件列表完整性",
+        detail: "挂载表里存在 TweakInject / MobileSubstrate 目录，但进程映像里一个该目录下的 dylib 都没有。目录在、插件无，说明注入被选择性过滤（如 Choicy 白名单）。",
+        run: {
+            guard let mounts = aegisFetchMounts() else { return nil }
+
+            let hasTweakDir = mounts.contains { m in
+                let l = m.lowercased()
+                return l.contains("tweakinject") || l.contains("mobilesubstrate")
+            }
+            guard hasTweakDir else { return nil }
+
+            let rawCount = aegis_dyld_image_count()
+            guard rawCount > 0 else { return nil }
+            let count = Int(rawCount)
+
+            var tweakLoaded = 0
+            for i in 0..<min(count, 500) {
+                guard let cname = aegis_dyld_image_name(Int32(i)) else { continue }
+                let l = String(cString: cname).lowercased()
+                if l.contains("/var/jb/library/mobilesubstrate")
+                    || l.contains("/var/jb/library/tweakinject")
+                    || l.contains("/library/mobilesubstrate")
+                    || l.contains("/library/tweakinject") {
+                    tweakLoaded += 1
+                }
+            }
+
+            if tweakLoaded == 0 {
+                return "TweakInject 目录存在，但未加载任何 tweak（注入被过滤）"
+            }
+            return nil
+        }
+    )
+
+    // MARK: A13 · RootHide 路径熵值
+
+    /// 香农熵
+    private static func shannonEntropy(_ s: String) -> Double {
+        guard !s.isEmpty else { return 0 }
+        var counts: [Character: Int] = [:]
+        for c in s { counts[c, default: 0] += 1 }
+        let n = Double(s.count)
+        var h = 0.0
+        for (_, v) in counts {
+            let p = Double(v) / n
+            h -= p * log2(p)
+        }
+        return h
+    }
+
+    static let roothideEntropyCheck = Detector(
+        id: "A13",
+        level: .a,
+        name: "RootHide 路径熵值",
+        detail: "对挂载表中含 jb 关键字的路径计算字符分布香农熵。RootHide 类方案会把 jbroot 挂到随机命名的目录（如 /.jbroot-<hex>），熵值明显高于常规路径名。",
+        run: {
+            guard let mounts = aegisFetchMounts() else { return nil }
+
+            var hits: [String] = []
+            for m in mounts {
+                let lower = m.lowercased()
+                guard lower.contains("jbroot") || lower.contains("/.jb")
+                    || lower.contains("jailbreak") else { continue }
+
+                let h = shannonEntropy(m)
+                if h > 4.3 {
+                    let short = (m as NSString).lastPathComponent
+                    hits.append("\(short)（熵 \(String(format: "%.2f", h))）")
+                }
+            }
+
+            guard !hits.isEmpty else { return nil }
+            return "随机化挂载点：" + hits.prefix(3).joined(separator: "；")
+        }
+    )
+
+    // MARK: A14 · Rootful 路径残留
+
+    static let rootfulResidueCheck = Detector(
+        id: "A14",
+        level: .a,
+        name: "Rootful 路径残留",
+        detail: "解析越狱路径下各 dylib 的 LC_LOAD_DYLIB，查找是否仍依赖 /Library/MobileSubstrate 等 Rootful 旧路径。用 XinaA15 之类工具强转的无根插件常留下这种痕迹。",
+        run: {
+            let rawCount = aegis_dyld_image_count()
+            guard rawCount > 0 else { return nil }
+            let count = Int(rawCount)
+            let limit = min(count, 300)
+
+            var hits: [String] = []
+            var buf = [CChar](repeating: 0, count: 16384)
+
+            for i in 0..<limit {
+                guard let cname = aegis_dyld_image_name(Int32(i)) else { continue }
+                let imgPath = String(cString: cname)
+                let lowerImg = imgPath.lowercased()
+
+                // 只看越狱路径下的库
+                guard lowerImg.contains("/var/jb") || lowerImg.contains("/.jbroot") else { continue }
+
+                let n = buf.withUnsafeMutableBufferPointer { p -> Int32 in
+                    aegis_image_load_dylibs(Int32(i), p.baseAddress, size_t(16384))
+                }
+                guard n > 0 else { continue }
+
+                let raw = String(cString: buf)
+                for dep in raw.split(separator: "\n") {
+                    let d = String(dep).lowercased()
+                    if d.hasPrefix("/library/mobilesubstrate")
+                        || d.hasPrefix("/usr/lib/substrate")
+                        || d.hasPrefix("/usr/lib/libsubstrate") {
+                        let short = (imgPath as NSString).lastPathComponent
+                        hits.append("\(short) → \(dep)")
+                        break
+                    }
+                }
+                if hits.count >= 3 { break }
+            }
+
+            guard !hits.isEmpty else { return nil }
+            return hits.joined(separator: "；")
+        }
+    )
 }

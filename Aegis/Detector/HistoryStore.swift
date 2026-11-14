@@ -200,6 +200,21 @@ extension DetectorCatalog {
         "A11": DetectorMeta(weight: 22,
             bypass: "entitlements 由内核签名绑定，重签名必然改变 application-identifier"),
 
+        "C6": DetectorMeta(weight: 6,
+            bypass: "区域、语言、时区三者要同时伪造，改一处就会互相矛盾"),
+
+        "B13": DetectorMeta(weight: 14,
+            bypass: "要么连挂载表一起隐藏（需要 mount namespace），要么别用过滤工具"),
+        "B14": DetectorMeta(weight: 12,
+            bypass: "屏蔽插件本身要先做到无痕加载，难度比隐藏越狱还高"),
+
+        "A12": DetectorMeta(weight: 20,
+            bypass: "目录存在但零加载是硬矛盾，除非连挂载表一并处理"),
+        "A13": DetectorMeta(weight: 24,
+            bypass: "随机挂载点要配合降低熵值（如固定前缀），但那样就失去了随机性"),
+        "A14": DetectorMeta(weight: 22,
+            bypass: "转换包必须重写 LC_LOAD_DYLIB 指向，否则旧路径一眼可见"),
+
         "A1": DetectorMeta(weight: 25,
             bypass: "必须同时 Hook libc 与裸 syscall 且结果完全一致，极易露馅"),
         "A2": DetectorMeta(weight: 20,

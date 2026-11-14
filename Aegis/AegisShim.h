@@ -79,5 +79,6 @@ int  aegis_self_load_dylibs(char *out, size_t outSize);
 bool aegis_self_header_info(uint32_t *outNcmds, uint32_t *outSizeofcmds);
 
 bool aegis_self_cryptid(uint32_t *outCryptid);
+int  aegis_image_load_dylibs(int index, char *out, size_t outSize);
 #endif /* AegisShim_h */
 
