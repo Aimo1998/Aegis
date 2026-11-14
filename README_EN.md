@@ -274,3 +274,9 @@ To supply custom notes, pass a Markdown file as the fourth argument:
 ## Disclaimer
 
 This project is intended for **security research and inspecting devices you own**. Results do not constitute a security verdict; do not use it to audit devices without authorization.
+
+---
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
