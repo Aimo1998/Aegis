@@ -2,14 +2,14 @@
 
 [Click me to switch English.](README_EN.md)
 
-> 一个纯本地的 iOS 越狱环境检测 App —— 三级递进，28 项检测，覆盖从传统有根越狱到 RootHide 级别的高级隐藏。
+> 一个纯本地的 iOS 越狱环境检测 App —— 三级递进，34 项检测，覆盖从传统有根越狱到 RootHide 级别的高级隐藏。
 
 **全程离线运行，不联网、不上传任何数据。**
 
 ```
 🔵 C 级 · 基础特征          5 项
-🟡 B 级 · 现代无根与注入     12 项
-🔴 A 级 · 深度对抗与底层校验  11 项
+🟡 B 级 · 现代无根与注入     14 项
+🔴 A 级 · 深度对抗与底层校验  14 项
 ```
 
 ---
@@ -23,7 +23,7 @@
 - **零第三方依赖**：纯 SwiftUI + Darwin + DeviceCheck
 - **报告导出**：纯文本 / JSON / 摘要三种格式，点击即复制到剪贴板并弹系统分享面板
 - **单项重测**：结果页展开任意未通过项，可只重跑这一项，报告原地更新
-- **中英双语**：28 项检测的名称、原理、绕过说明全部双语，运行时切换无需重启
+- **中英双语**：34 项检测的名称、原理、绕过说明全部双语，运行时切换无需重启
 - **系统信息诊断页**：把所有检测依赖的底层返回值（sysctl / csops / lstat-vs-syscall / 挂载表 / 进程表）原样列出，便于核对判定是否准确
 - **底层全走 C shim**：`fork` / `ptrace` / `_dyld_*` / `getfsstat` 在 Swift 里被标 unavailable 或签名难对齐，统一由 `AegisShim.c` 封装
 
@@ -31,7 +31,7 @@
 
 ## 检测项矩阵
 
-### 🔵 C 级 · 基础特征（5 项）
+### 🔵 C 级 · 基础特征（6 项）
 
 | ID | 检测项 | 实现要点 |
 |---|---|---|
@@ -40,8 +40,9 @@
 | C3 | 沙盒逃逸与进程创建 | 向 `/private`、`/var/jb`、`/tmp` 写探针；`syscall(SYS_fork)` 建子进程 |
 | C4 | 环境变量审查 | `DYLD_INSERT_LIBRARIES` / `DYLD_FRAMEWORK_PATH` 等 8 个变量，判断是否含非系统路径 |
 | C5 | 模拟器与硬件指纹 | `TARGET_OS_SIMULATOR` + `hw.machine` + Secure Enclave / 生物识别硬件存在性 |
+| C6 | 区域与系统一致性 | `NSLocale` 区域码合法性、区域/语言矛盾组合、时区是否匹配 |
 
-### 🟡 B 级 · 现代无根与注入（12 项）
+### 🟡 B 级 · 现代无根与注入（14 项）
 
 | ID | 检测项 | 实现要点 |
 |---|---|---|
@@ -57,8 +58,10 @@
 | B10 | 自身运行路径 | 检查可执行文件是否位于 `/var/jb`、`/private/preboot`、`/.jbroot` 下 |
 | B11 | 动态库数量基线 | 正常 150~320；>420 判批量注入，<90 判环境被裁剪 |
 | B12 | 本地服务端口 | 扫 22 / 1337 / 4444 / 8080 / 9090 / 31337 / 27042-27044 |
+| B13 | 注入过滤不一致性 | 挂载表有 `/var/jb`，dyld 中却无 ellekit/substrate |
+| B14 | 屏蔽插件特征 | 匹配 noJailbreak / Shadow / Choicy / HBIDHook / Liberty / vnodebypass / A-Bypass / FlyJB 等 14 个 |
 
-### 🔴 A 级 · 深度对抗与底层校验（11 项）
+### 🔴 A 级 · 深度对抗与底层校验（14 项）
 
 | ID | 检测项 | 实现要点 |
 |---|---|---|
@@ -73,6 +76,9 @@
 | A9 | csops 完整性 | 连调 3 次 `csops(CS_OPS_STATUS)`，返回值不稳定即判 Hook；`CS_VALID` 必须置位 |
 | A10 | Mach-O 自检 | 绕过 `_dyld_*`，直接解析主程序 load commands 的 `LC_LOAD_DYLIB`，与 dyld 视图交叉比对 |
 | A11 | Entitlements 校验 | `SecTask` 读 `application-identifier` / `get-task-allow` / `platform-application` |
+| A12 | 插件列表完整性 | TweakInject 目录存在但零 tweak 加载 |
+| A13 | RootHide 路径熵值 | 对含 `jb` 的挂载点算香农熵，>4.3 判随机化命名 |
+| A14 | Rootful 路径残留 | 解析各 dylib 的 `LC_LOAD_DYLIB`，找 `/Library/MobileSubstrate` 等旧路径 |
 
 ---
 
@@ -164,9 +170,33 @@ Failed on both · 3
 
 ---
 
+## 管理（Admin）模式
+
+入口在**对比页底部**，用于临时关闭某些检测项。
+
+| 第一栏 | 第二栏 | 结果 |
+|---|---|---|
+| `Yesadminpassword=` | `HDOANQK639151Aegis6H82JS` | 解锁 |
+| `Noadminpassword=` | （留空） | 退出并清空设置 |
+| 其他 | 其他 | 提示口令不对 |
+
+解锁后出现三个可展开分组，34 项各一个开关：
+
+```
+🔵 C 级 · 6 项
+🟡 B 级 · 14 项
+🔴 A 级 · 14 项
+```
+
+关掉的项不参与扫描，风险评分的分母同步变化。设置存在 `@AppStorage`（`aegis.admin.enabled` / `aegis.admin.disabled`），重启 App 仍然有效。
+
+典型用法：调试某个检测项时临时关掉其余项，或排查误报时逐项开关。
+
+---
+
 ## 风险评分
 
-28 项检测各有权重（合计 **410 分**），命中项权重按比例换算成 0–100 的风险分：
+34 项检测各有权重（合计 **503 分**），命中项权重按比例换算成 0–100 的风险分：
 
 | 分数 | 等级 | 含义 |
 |---|---|---|
@@ -190,6 +220,9 @@ Failed on both · 3
 | — | — | B10 | 10 | A10 | 24 |
 | — | — | B11 | 8 | A11 | 22 |
 | — | — | B12 | 10 | — | — |
+| C6 | 6 | B13 | 14 | A12 | 20 |
+| — | — | B14 | 12 | A13 | 24 |
+| — | — | — | — | A14 | 22 |
 
 > 判定仍沿用「任一命中即 😢」，评分只用于表达严重程度。若要按分数阈值判定，改 `ScanReport.isJailbroken` 即可。
 
