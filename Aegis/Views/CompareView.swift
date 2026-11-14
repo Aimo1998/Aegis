@@ -13,8 +13,10 @@ struct CompareView: View {
     @State private var textA = ""
     @State private var textB = ""
     @State private var diff: DiffResult?
+    @State private var toastMsg: String?
 
     @ObservedObject private var l10n = L10n.shared
+    @ObservedObject private var admin = AdminStore.shared
 
     struct DiffResult {
         var onlyA: [(String, String)] = []      // A 失败、B 通过
@@ -37,6 +39,7 @@ struct CompareView: View {
 
                 Button {
                     hideKeyboard()
+                    if handleAdminCommand() { return }
                     diff = analyze()
                 } label: {
                     Text(l10n.t("开始对比", "Compare"))
@@ -60,7 +63,9 @@ struct CompareView: View {
                     resultSection(d)
                 }
 
-                AdminSection()
+                if admin.enabled {
+                    adminToggles
+                }
 
                 MadeByFooter()
             }
@@ -69,12 +74,118 @@ struct CompareView: View {
             .padding(.bottom, 40)
         }
         .scrollDismissesKeyboard(.interactively)
+        .overlay(alignment: .top) {
+            if let t = toastMsg {
+                ToastView(text: t)
+                    .padding(.top, 8)
+                    .allowsHitTesting(false)
+                    .onAppear {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
+                            toastMsg = nil
+                        }
+                    }
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: toastMsg)
     }
 
     private func hideKeyboard() {
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),
                                         to: nil, from: nil, for: nil)
     }
+
+    // MARK: Admin 指令
+
+    /// 两个输入框里填口令/密钥时走管理流程，不当作报告解析
+    private func handleAdminCommand() -> Bool {
+        let a = textA.trimmingCharacters(in: .whitespacesAndNewlines)
+        let b = textB.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard a.lowercased().contains("adminpassword") else { return false }
+
+        switch admin.verify(a, b) {
+        case .entered, .exited:
+            textA = ""; textB = ""
+            diff = nil
+            return true
+        case .wrongKey, .invalid:
+            textA = ""; textB = ""
+            toastMsg = L10n.shared.t("口令或密钥不正确", "Wrong passphrase or key")
+            return true
+        }
+    }
+
+    // MARK: 解锁后的检测项开关
+
+    private var adminToggles: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 7) {
+                Image(systemName: "lock.open.fill")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color(red: 0.45, green: 0.9, blue: 0.6))
+                Text(l10n.t("检测项管理 · 已解锁", "Detectors · unlocked"))
+                    .font(.system(size: 12.5, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.75))
+                Spacer()
+                Button {
+                    admin.disabledIDs = []
+                } label: {
+                    Text(l10n.t("全开", "All"))
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .foregroundStyle(Color(red: 0.55, green: 0.82, blue: 1.0))
+                }
+                .buttonStyle(.plain)
+            }
+
+            ForEach(DetectionLevel.allCases) { level in
+                DisclosureGroup {
+                    ForEach(level.own) { d in
+                        Toggle(isOn: Binding(
+                            get: { admin.isEnabled(d.id) },
+                            set: { admin.setEnabled(d.id, $0) }
+                        )) {
+                            HStack(spacing: 6) {
+                                Text(d.id)
+                                    .font(.system(size: 10.5, design: .monospaced))
+                                    .foregroundStyle(.white.opacity(0.32))
+                                    .frame(width: 26, alignment: .leading)
+                                Text(L10n.shared.detectorName(id: d.id, fallback: d.name))
+                                    .font(.system(size: 11.5, design: .rounded))
+                                    .foregroundStyle(.white.opacity(0.7))
+                            }
+                        }
+                        .tint(Color(red: 0.42, green: 0.70, blue: 1.0))
+                    }
+                } label: {
+                    Text("\(level.badge) \(level.title) · \(level.own.count)")
+                        .font(.system(size: 11.5, weight: .medium, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.55))
+                }
+                .tint(.white.opacity(0.35))
+            }
+
+            Button {
+                textA = AdminStore.exitToken
+                _ = admin.verify(textA, "")
+                textA = ""; textB = ""
+            } label: {
+                Text(l10n.t("退出管理", "Exit admin"))
+                    .font(.system(size: 11.5, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color(red: 1.0, green: 0.6, blue: 0.55))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(13)
+        .background(
+            RoundedRectangle(cornerRadius: 13, style: .continuous)
+                .fill(Color.white.opacity(0.04))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 13, style: .continuous)
+                        .stroke(Color(red: 0.45, green: 0.9, blue: 0.6).opacity(0.35), lineWidth: 1)
+                )
+        )
+    }
+
 
     private var intro: some View {
         VStack(alignment: .leading, spacing: 6) {
