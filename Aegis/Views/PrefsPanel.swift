@@ -117,7 +117,7 @@ struct PrefsPanel: View {
                     .foregroundStyle(.white.opacity(0.32))
                     .frame(width: 26, alignment: .leading)
 
-                Text(L10n.shared.detectorName(id: d.id, fallback: d.name))
+                Text(detectorTitle(d))
                     .font(.system(size: 12, design: .rounded))
                     .foregroundStyle(color(state).opacity(0.9))
                     .lineLimit(1)
@@ -189,6 +189,19 @@ struct PrefsPanel: View {
     }
 
     // MARK: 状态
+
+    private func detectorTitle(_ d: Detector) -> String {
+        let name: String = L10n.shared.detectorName(id: d.id, fallback: d.name)
+        return name
+    }
+
+    private func levelLabel(_ level: DetectionLevel) -> String {
+        let b: String = level.badge
+        let t: String = level.title
+        let c: String = String(level.own.count)
+        return b + " " + t + " · " + c
+    }
+
 
     private func stateOf(_ id: String) -> PrefsState {
         if !vault.isActive(id) { return .skipped }

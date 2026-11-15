@@ -95,6 +95,35 @@ struct CompareView: View {
     }
 
     /// 单独抽出来，避免 SwiftUI 对这串插值做类型检查时超时
+    /// 单个检测项行：把 Binding 与名称解析都移出 ViewBuilder，
+    /// 否则深层嵌套下 Swift 的类型检查器会超时
+    private func toggleRow(_ d: Detector) -> some View {
+        Toggle(isOn: activeBinding(d.id)) {
+            HStack(spacing: 6) {
+                Text(d.id)
+                    .font(.system(size: 10.5, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.32))
+                    .frame(width: 26, alignment: .leading)
+                Text(detectorTitle(d))
+                    .font(.system(size: 11.5, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.7))
+            }
+        }
+        .tint(Color(red: 0.42, green: 0.70, blue: 1.0))
+    }
+
+    private func activeBinding(_ id: String) -> Binding<Bool> {
+        Binding(
+            get: { vault.isActive(id) },
+            set: { vault.setActive(id, $0) }
+        )
+    }
+
+    private func detectorTitle(_ d: Detector) -> String {
+        let name: String = L10n.shared.detectorName(id: d.id, fallback: d.name)
+        return name
+    }
+
     private func sectionLabel(_ level: DetectionLevel) -> String {
         let badge: String = level.badge
         let title: String = level.title
@@ -149,21 +178,7 @@ struct CompareView: View {
             ForEach(DetectionLevel.allCases) { level in
                 DisclosureGroup {
                     ForEach(level.own) { d in
-                        Toggle(isOn: Binding(
-                            get: { vault.isActive(d.id) },
-                            set: { vault.setActive(d.id, $0) }
-                        )) {
-                            HStack(spacing: 6) {
-                                Text(d.id)
-                                    .font(.system(size: 10.5, design: .monospaced))
-                                    .foregroundStyle(.white.opacity(0.32))
-                                    .frame(width: 26, alignment: .leading)
-                                Text(L10n.shared.detectorName(id: d.id, fallback: d.name))
-                                    .font(.system(size: 11.5, design: .rounded))
-                                    .foregroundStyle(.white.opacity(0.7))
-                            }
-                        }
-                        .tint(Color(red: 0.42, green: 0.70, blue: 1.0))
+                        toggleRow(d)
                     }
                 } label: {
                     Text(sectionLabel(level))
