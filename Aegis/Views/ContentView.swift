@@ -265,7 +265,7 @@ struct ContentView: View {
 
                 Spacer()
 
-                Text("\(vault.skippedCount)/\(vault.forcedCount)")
+                Text("\(vault.skipCount)/\(vault.softCount)")
                     .font(.system(size: 10.5, design: .monospaced))
                     .foregroundStyle(.white.opacity(0.3))
             }

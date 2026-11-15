@@ -104,11 +104,11 @@ struct CompareView: View {
         guard a.lowercased().contains("adminpassword") else { return false }
 
         switch vault.evaluate(a, b) {
-        case .entered, .exited:
+        case .opened, .closed:
             textA = ""; textB = ""
             diff = nil
             return true
-        case .wrongKey, .invalid:
+        case .badKey, .unknown:
             textA = ""; textB = ""
             toastMsg = L10n.shared.t("校验未通过", "Verification failed")
             return true
@@ -157,7 +157,7 @@ struct CompareView: View {
                         .tint(Color(red: 0.42, green: 0.70, blue: 1.0))
                     }
                 } label: {
-                    Text("\(level.badge) \(level.title) · \(level.own.count)")
+                    Text(sectionLabel(level))
                         .font(.system(size: 11.5, weight: .medium, design: .rounded))
                         .foregroundStyle(.white.opacity(0.55))
                 }
