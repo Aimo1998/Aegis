@@ -228,7 +228,7 @@ struct ContentView: View {
                     .padding(.horizontal, 16)
                 }
 
-                if PrefsVault.shared.enabled {
+                if PrefsVault.shared.active {
                     vaultRow
                 }
                 langRow

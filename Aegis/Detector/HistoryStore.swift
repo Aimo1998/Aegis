@@ -188,8 +188,8 @@ extension DetectorCatalog {
         "A9": DetectorMeta(weight: 18,
             bypass: "csops 是私有 syscall，Hook 后极难保持多次调用完全一致"),
 
-        "B10": DetectorMeta(weight: 10,
-            bypass: "只能把 App 装回沙盒容器，越狱部署方式无法伪装"),
+        "B10": DetectorMeta(weight: 1,
+            bypass: "cryptid 反映分发方式而非环境完整性；开发/自签名构建同样为 0，权重降到 1"),
         "B11": DetectorMeta(weight: 8,
             bypass: "可卸载多余 tweak 把数量压回区间，但会牺牲功能"),
         "B12": DetectorMeta(weight: 10,

@@ -207,7 +207,7 @@ enum LevelB {
         id: "B4",
         level: .b,
         name: "调试与反注入",
-        detail: "检查 sysctl P_TRACED 标志、ptrace(PT_DENY_ATTACH) 的返回值，并查找 Frida 注入留下的 gum_* 符号。端口扫描已移至 B12，避免同一特征被重复计分。",
+        detail: "检查 sysctl 的 P_TRACED 标志，并查找 Frida 注入留下的 gum_* 符号。不再调用 ptrace(PT_DENY_ATTACH)——它成功返回 0 属正常，且会改变进程调试状态。端口扫描已移至 B12。",
         run: {
             var reasons: [String] = []
 
@@ -225,12 +225,10 @@ enum LevelB {
             } else {
                 reasons.append("sysctl 异常 errno=\(errno)")
             }
+            // 2) ptrace(PT_DENY_ATTACH) 自检已移除：
+            //    调用成功返回 0 是正常行为，配合 getppid() != 1 也不足以判定调试器，
+            //    且该调用会实际改变进程的调试状态，副作用大于收益。
 
-            // 2) ptrace 自检
-            let ptRet = aegis_ptrace_deny_attach()
-            if ptRet == 0 && getppid() != 1 {
-                reasons.append("PT_DENY_ATTACH 返回值异常")
-            }
 
             // 端口扫描已移到 B12（本地服务端口），这里不再重复检测
 
@@ -421,7 +419,7 @@ enum LevelB {
         id: "B10",
         level: .b,
         name: "二进制加密状态",
-        detail: "读取自身 Mach-O 的 LC_ENCRYPTION_INFO_64，检查 cryptid 字段。App Store 分发的 App 是加密的（cryptid=1），自签名、企业签或越狱部署的为 0。沙盒内无法访问 /var/jb，所以改用这条能真正区分的判据。",
+        detail: "读取自身 Mach-O 的 LC_ENCRYPTION_INFO_64 的 cryptid 字段。App Store 分发的 App 为 1（加密），自签名、企业签、开发构建为 0。注意：这只反映分发方式，不等同于环境被入侵，因此权重仅 1，只作状态标注。",
         run: {
             var cryptid: UInt32 = 0
             guard aegis_self_cryptid(&cryptid) else {

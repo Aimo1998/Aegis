@@ -32,8 +32,8 @@ final class ScanEngine: ObservableObject {
 
         // 启用偏好后可单独略过某些检测项
         let allChecks = level.checks(cascade: cascade)
-        let checks = PrefsVault.shared.enabled
-            ? allChecks.filter { PrefsVault.shared.isEnabled($0.id) }
+        let checks = PrefsVault.shared.active
+            ? allChecks.filter { PrefsVault.shared.isActive($0.id) }
             : allChecks
 
         // 必须在后台线程跑：

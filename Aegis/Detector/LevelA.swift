@@ -319,7 +319,11 @@ enum LevelA {
                 }
                 sem.signal()
             }
-            _ = sem.wait(timeout: .now() + 8)
+
+            // 超时不能当作「通过」——服务没响应本身就是一个明确状态
+            if sem.wait(timeout: .now() + 8) == .timedOut {
+                return "App Attest 8 秒内无回调（服务不可用）"
+            }
 
             return failure
             #endif

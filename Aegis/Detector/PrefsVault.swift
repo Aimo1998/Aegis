@@ -106,6 +106,15 @@ final class PrefsVault: ObservableObject {
 
     // MARK: 校验
 
+    /// 去掉所有空白与零宽字符，容忍复制粘贴带出的杂质
+    private static func normalizeInput(_ s: String) -> String {
+        var out = s.components(separatedBy: .whitespacesAndNewlines).joined()
+        out = out.replacingOccurrences(of: "\u{200B}", with: "")
+        out = out.replacingOccurrences(of: "\u{FEFF}", with: "")
+        out = out.replacingOccurrences(of: "\u{00A0}", with: "")
+        return out
+    }
+
     enum Verdict {
         case opened
         case closed
@@ -114,8 +123,8 @@ final class PrefsVault: ObservableObject {
     }
 
     func evaluate(_ a: String, _ b: String) -> Verdict {
-        let first  = a.trimmingCharacters(in: .whitespacesAndNewlines)
-        let second = b.trimmingCharacters(in: .whitespacesAndNewlines)
+        let first  = PrefsVault.normalizeInput(a)
+        let second = PrefsVault.normalizeInput(b)
 
         if first.hasPrefix("No") || first == PrefsVault.exitPhrase {
             active = false
