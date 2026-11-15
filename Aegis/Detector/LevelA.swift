@@ -534,7 +534,7 @@ enum LevelA {
         id: "A11",
         level: .a,
         name: "Entitlements 校验",
-        detail: "用 SecTask 读取本进程的 entitlements，校验 application-identifier 是否为 TeamID.BundleID 格式、get-task-allow 状态、以及是否存在异常的自定义权限。重签名常在这里留下痕迹。",
+        detail: "用 SecTask 读取本进程的 entitlements，校验 application-identifier 与 BundleID 的对应关系、get-task-allow 状态、以及 platform-application 这类危险权限。TrollStore 分发使用固定的 TROLLTROLL.* 标识并自带 get-task-allow，属于已知安装方式，不计入异常。",
         run: {
             guard let task = ph_SecTaskCreateFromSelf(nil) else { return nil }
 
@@ -544,18 +544,26 @@ enum LevelA {
             let appIdKey = "application-identifier" as CFString
             let bid = Bundle.main.bundleIdentifier ?? ""
 
-            if let val = ph_SecTaskCopyValueForEntitlement(task, appIdKey, nil) as? String {
-                let comps = val.split(separator: ".")
+            // TrollStore 分发：伪签名固定使用 TROLLTROLL.* 标识，
+            // 并总是带 get-task-allow。这是已知的安装方式，不是签名异常。
+            var isTrollStore = false
 
-                // 只认「明显不对」的情况：
-                //   1) 根本没有 BundleID 段，且字符串里也找不到自己的 BundleID
-                //   2) TeamID 长度不像账号 ID（Apple 的 TeamID 是 10 位，
-                //      但企业/教育账号偶有 11~12 位，给一点余量）
-                if !bid.isEmpty && !val.contains(bid) {
-                    issues.append("application-identifier(\(val)) 不含 BundleID(\(bid))")
-                }
-                if let team = comps.first, team.count < 9 || team.count > 13 {
-                    issues.append("TeamID 长度异常：\(team)（\(team.count) 位）")
+            if let val = ph_SecTaskCopyValueForEntitlement(task, appIdKey, nil) as? String {
+                if val.hasPrefix("TROLLTROLL.") {
+                    isTrollStore = true
+                } else {
+                    let comps = val.split(separator: ".")
+
+                    // 只认「明显不对」的情况：
+                    //   1) 字符串里找不到自己的 BundleID
+                    //   2) TeamID 长度不像账号 ID（Apple 是 10 位，
+                    //      企业/教育账号偶有 11~12 位，给一点余量）
+                    if !bid.isEmpty && !val.contains(bid) {
+                        issues.append("application-identifier(\(val)) 不含 BundleID(\(bid))")
+                    }
+                    if let team = comps.first, team.count < 9 || team.count > 13 {
+                        issues.append("TeamID 长度异常：\(team)（\(team.count) 位）")
+                    }
                 }
             }
             // 注意：这里故意不把「缺少 application-identifier」当作异常。
@@ -563,7 +571,7 @@ enum LevelA {
 
             // get-task-allow
             let gtaKey = "get-task-allow" as CFString
-            if let gta = ph_SecTaskCopyValueForEntitlement(task, gtaKey, nil) as? Bool, gta {
+            if let gta = ph_SecTaskCopyValueForEntitlement(task, gtaKey, nil) as? Bool, gta, !isTrollStore {
                 issues.append("get-task-allow=true（允许调试器附加）")
             }
 
