@@ -196,7 +196,7 @@ struct CompareView: View {
             }
 
             Button {
-                textA = PrefsVault.exitToken
+                textA = PrefsVault.exitPhrase
                 _ = vault.evaluate(textA, "")
                 textA = ""; textB = ""
             } label: {
