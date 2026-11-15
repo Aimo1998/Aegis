@@ -94,6 +94,15 @@ struct CompareView: View {
                                         to: nil, from: nil, for: nil)
     }
 
+    /// 单独抽出来，避免 SwiftUI 对这串插值做类型检查时超时
+    private func sectionLabel(_ level: DetectionLevel) -> String {
+        let badge: String = level.badge
+        let title: String = level.title
+        let count: String = String(level.own.count)
+        return badge + " " + title + " · " + count
+    }
+
+
     // MARK: 校验输入
 
     /// 两个输入框里填校验值时走配置流程，不当作报告解析
