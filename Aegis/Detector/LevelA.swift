@@ -548,8 +548,16 @@ enum LevelA {
             // 并总是带 get-task-allow。这是已知的安装方式，不是签名异常。
             var isTrollStore = false
 
+            // 已知的伪签名前缀：TrollStore 系（含 Lite）统一使用 TROLLTROLL.*，
+            // 其他工具各有自己的固定标识。这些都属于已知安装方式，
+            // 不该按「第三方重签名」处理。
+            let pseudoPrefixes = [
+                "TROLLTROLL.", "TROLLSTORE.", "LITE.", "SIGNIFY.",
+                "ALTSTORE.", "SIDELOADLY.", "ESIGN."
+            ]
+
             if let val = ph_SecTaskCopyValueForEntitlement(task, appIdKey, nil) as? String {
-                if val.hasPrefix("TROLLTROLL.") {
+                if pseudoPrefixes.contains(where: { val.hasPrefix($0) }) {
                     isTrollStore = true
                 } else {
                     let comps = val.split(separator: ".")
