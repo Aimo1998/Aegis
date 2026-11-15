@@ -234,44 +234,6 @@ Failed on both · 3
 
 ---
 
-## 技术说明
-
-### 为什么底层调用都走 C shim
-
-Swift 里这些符号要么被标 `unavailable`，要么签名难对齐：
-
-| 符号 | Swift 下的问题 |
-|---|---|
-| `fork()` | `unavailable: Please use threads or posix_spawn*()` |
-| `ptrace()` / `PT_DENY_ATTACH` | 符号与常量都不导出；iOS SDK 没有 `<sys/ptrace.h>` |
-| `_dyld_image_count()` / `_dyld_get_image_name()` | 不随 `import Darwin` 暴露 |
-| `getfsstat()` | 数组指针与元组重绑定容易踩坑 |
-| `csops()` | 私有 syscall，无 libc 包装 |
-
-统一封装进 `AegisShim.c`，Swift 侧只调简单接口：
-
-```c
-int  aegis_dyld_image_count(void);
-const char *aegis_dyld_image_name(int index);
-int  aegis_ptrace_deny_attach(void);
-int  aegis_fork_raw(void);
-int  aegis_mount_points(char *out, size_t outSize);
-int  aegis_list_process_names(char *out, size_t outSize);
-int  aegis_csops(uint32_t pid, uint32_t ops, void *useraddr, uint32_t usersize);
-bool aegis_read_bootargs(char *buf, size_t bufSize, size_t *outLen);
-```
-
-### 计时攻击为什么有效
-
-RootHide 一类方案能在返回值和文件属性上做手脚，但**无法同时伪造耗时**：
-
-- 被 Hook 的路径 → 拦截 → 判断 → 返回伪造结果，耗时显著上升（通常 >4x）
-- 直接伪造 ENOENT → 跳过真实 VFS 查找，耗时异常短（<0.15x）
-
-以 `getpid()`（纯 syscall）与 `/System/Library`（正常 lstat）作为双基线，偏差超过阈值即判定可疑。
-
----
-
 ## 已知限制
 
 1. **A6 App Attest** 需付费开发者账号的 `com.apple.developer.devicecheck.appattest-environment` entitlement；免费签环境下 `isSupported` 为 false，该项自动跳过
