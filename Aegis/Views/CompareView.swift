@@ -97,6 +97,22 @@ struct CompareView: View {
     /// 单独抽出来，避免 SwiftUI 对这串插值做类型检查时超时
     /// 单个检测项行：把 Binding 与名称解析都移出 ViewBuilder，
     /// 否则深层嵌套下 Swift 的类型检查器会超时
+    /// 整个 DisclosureGroup 包成独立 ViewBuilder：
+    /// 直接写在 ForEach 里会让 Label/Content 双泛型推断超时
+    @ViewBuilder
+    private func levelSection(_ level: DetectionLevel) -> some View {
+        DisclosureGroup {
+            ForEach(level.own) { d in
+                toggleRow(d)
+            }
+        } label: {
+            Text(sectionLabel(level))
+                .font(.system(size: 11.5, weight: .medium, design: .rounded))
+                .foregroundStyle(.white.opacity(0.55))
+        }
+        .tint(.white.opacity(0.35))
+    }
+
     private func toggleRow(_ d: Detector) -> some View {
         Toggle(isOn: activeBinding(d.id)) {
             HStack(spacing: 6) {
@@ -176,16 +192,7 @@ struct CompareView: View {
             }
 
             ForEach(DetectionLevel.allCases) { level in
-                DisclosureGroup {
-                    ForEach(level.own) { d in
-                        toggleRow(d)
-                    }
-                } label: {
-                    Text(sectionLabel(level))
-                        .font(.system(size: 11.5, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.55))
-                }
-                .tint(.white.opacity(0.35))
+                levelSection(level)
             }
 
             Button {
