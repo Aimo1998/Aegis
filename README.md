@@ -1,5 +1,4 @@
-<img src="https://github.com/Aimo1998/Aegis/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png" width="64" />
-# Aegis
+## Aegis
 
 [Click me to switch English.](README_EN.md)
 
